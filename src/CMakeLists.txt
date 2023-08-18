@@ -166,7 +166,7 @@ if(APPLE)
   list(APPEND SOURCE_FILES "common/pwstorage/backend_apple_keychain.c")
   list(APPEND HEADER_FILES "common/pwstorage/backend_apple_keychain.h")
 
-  list(APPEND SOURCE_FILES "osx/dt_metal.mm")
+  list(APPEND SOURCE_FILES "osx/dt_metal.cc")
   list(APPEND HEADER_FILES "osx/dt_metal.h")
 
   include(CheckLanguage)
@@ -175,7 +175,6 @@ if(APPLE)
     enable_language(OBJCXX)
   else()
     set_source_files_properties(osx/osx.mm PROPERTIES LANGUAGE CXX)
-    set_source_files_properties(osx/dt_metal.mm PROPERTIES LANGUAGE CXX)
   endif()
 endif(APPLE)
 
