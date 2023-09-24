@@ -45,6 +45,10 @@
 #include "gui/color_picker_proxy.h"
 #include "iop/iop_api.h"
 
+#ifdef __APPLE__
+#include "osx/dt_metal.h"
+#endif
+
 #define exposure2white(x) exp2f(-(x))
 #define white2exposure(x) -dt_log2f(fmaxf(1e-20f, x))
 
@@ -492,6 +496,14 @@ static void _process_common_setup(dt_iop_module_t *self,
   const float white = exposure2white(exposure);
   d->scale = 1.0 / (white - d->black);
 }
+
+#ifdef __APPLE__
+int process_metal()
+{
+  dt_metal_list_devices(darktable.metal);
+  return 0;
+}
+#endif
 
 #ifdef HAVE_OPENCL
 int process_cl(struct dt_iop_module_t *self,

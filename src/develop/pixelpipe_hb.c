@@ -1635,6 +1635,15 @@ static gboolean _dev_pixelpipe_process_rec(
   if(dt_atomic_get_int(&pipe->shutdown))
     return TRUE;
 
+#ifdef __APPLE__
+  gboolean possible_metal = (module->process_metal != NULL);
+
+  if (possible_metal)
+  {
+    module->process_metal();
+  }
+#endif
+
 #ifdef HAVE_OPENCL
 
   // Fetch RGB working profile
