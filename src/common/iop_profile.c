@@ -102,6 +102,12 @@ static void _transform_from_to_rgb_lab_lcms2(const float *const image_in,
                (char)(rgb_color_space>>16),
                (char)(rgb_color_space>>8),
                (char)(rgb_color_space));
+      // dt_print(DT_DEBUG_ALWAYS,
+      //          "working profile color space `%c%c%c%c' not supported\n",
+      //          (char)(rgb_color_space>>24),
+      //          (char)(rgb_color_space>>16),
+      //          (char)(rgb_color_space>>8),
+      //          (char)(rgb_color_space));
         rgb_profile = NULL;
     }
   }
@@ -221,6 +227,31 @@ static void _transform_rgb_to_rgb_lcms2
              (char)(rgb_from_color_space >> 8),
              (char)(rgb_from_color_space));
     from_rgb_profile = NULL;
+    cmsColorSpaceSignature rgb_color_space = cmsGetColorSpace(from_rgb_profile);
+    if(rgb_color_space != cmsSigRgbData)
+    {
+      // dt_print(DT_DEBUG_ALWAYS,
+      //          "[_transform_rgb_to_rgb_lcms2] profile color space `%c%c%c%c' not supported\n",
+      //          (char)(rgb_color_space >> 24),
+      //          (char)(rgb_color_space >> 16),
+      //          (char)(rgb_color_space >> 8),
+      //          (char)(rgb_color_space));
+      from_rgb_profile = NULL;
+    }
+  }
+  if(to_rgb_profile)
+  {
+    cmsColorSpaceSignature rgb_color_space = cmsGetColorSpace(to_rgb_profile);
+    if(rgb_color_space != cmsSigRgbData)
+    {
+      // dt_print(DT_DEBUG_ALWAYS,
+      //          "[_transform_rgb_to_rgb_lcms2] profile color space `%c%c%c%c' not supported\n",
+      //          (char)(rgb_color_space >> 24),
+      //          (char)(rgb_color_space >> 16),
+      //          (char)(rgb_color_space >> 8),
+      //          (char)(rgb_color_space));
+      to_rgb_profile = NULL;
+    }
   }
 
   if(!to_is_rgb && !to_is_cmyk)
@@ -705,6 +736,23 @@ static gboolean _ioppr_generate_profile_info(dt_iop_order_iccprofile_info_t *pro
       (char)(rgb_profile_color_space>>16),
       (char)(rgb_profile_color_space>>8),
       (char)(rgb_profile_color_space));
+  // we only allow rgb profiles
+  if(rgb_profile)
+  {
+    cmsColorSpaceSignature rgb_color_space = cmsGetColorSpace(rgb_profile);
+    if(rgb_color_space != cmsSigRgbData)
+    {
+      // dt_print(DT_DEBUG_PIPE,
+      //          "[_ioppr_generate_profile_info] working profile color space"
+      //          " `%c%c%c%c' not supported\n",
+      //          (char)(rgb_color_space>>24),
+      //          (char)(rgb_color_space>>16),
+      //          (char)(rgb_color_space>>8),
+      //          (char)(rgb_color_space));
+      rgb_profile = NULL;
+      error = TRUE;
+    }
+  }
 
   // get the matrix
   if(rgb_profile)
