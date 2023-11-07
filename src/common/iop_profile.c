@@ -100,12 +100,12 @@ static void _transform_from_to_rgb_lab_lcms2(const float *const image_in,
     cmsColorSpaceSignature rgb_color_space = cmsGetColorSpace(rgb_profile);
     if(rgb_color_space != cmsSigRgbData)
     {
-      dt_print(DT_DEBUG_ALWAYS,
-               "working profile color space `%c%c%c%c' not supported\n",
-               (char)(rgb_color_space>>24),
-               (char)(rgb_color_space>>16),
-               (char)(rgb_color_space>>8),
-               (char)(rgb_color_space));
+      // dt_print(DT_DEBUG_ALWAYS,
+      //          "working profile color space `%c%c%c%c' not supported\n",
+      //          (char)(rgb_color_space>>24),
+      //          (char)(rgb_color_space>>16),
+      //          (char)(rgb_color_space>>8),
+      //          (char)(rgb_color_space));
         rgb_profile = NULL;
     }
   }
@@ -221,12 +221,12 @@ static void _transform_rgb_to_rgb_lcms2
     cmsColorSpaceSignature rgb_color_space = cmsGetColorSpace(from_rgb_profile);
     if(rgb_color_space != cmsSigRgbData)
     {
-      dt_print(DT_DEBUG_ALWAYS,
-               "[_transform_rgb_to_rgb_lcms2] profile color space `%c%c%c%c' not supported\n",
-               (char)(rgb_color_space >> 24),
-               (char)(rgb_color_space >> 16),
-               (char)(rgb_color_space >> 8),
-               (char)(rgb_color_space));
+      // dt_print(DT_DEBUG_ALWAYS,
+      //          "[_transform_rgb_to_rgb_lcms2] profile color space `%c%c%c%c' not supported\n",
+      //          (char)(rgb_color_space >> 24),
+      //          (char)(rgb_color_space >> 16),
+      //          (char)(rgb_color_space >> 8),
+      //          (char)(rgb_color_space));
       from_rgb_profile = NULL;
     }
   }
@@ -235,12 +235,12 @@ static void _transform_rgb_to_rgb_lcms2
     cmsColorSpaceSignature rgb_color_space = cmsGetColorSpace(to_rgb_profile);
     if(rgb_color_space != cmsSigRgbData)
     {
-      dt_print(DT_DEBUG_ALWAYS,
-               "[_transform_rgb_to_rgb_lcms2] profile color space `%c%c%c%c' not supported\n",
-               (char)(rgb_color_space >> 24),
-               (char)(rgb_color_space >> 16),
-               (char)(rgb_color_space >> 8),
-               (char)(rgb_color_space));
+      // dt_print(DT_DEBUG_ALWAYS,
+      //          "[_transform_rgb_to_rgb_lcms2] profile color space `%c%c%c%c' not supported\n",
+      //          (char)(rgb_color_space >> 24),
+      //          (char)(rgb_color_space >> 16),
+      //          (char)(rgb_color_space >> 8),
+      //          (char)(rgb_color_space));
       to_rgb_profile = NULL;
     }
   }
@@ -760,13 +760,13 @@ static gboolean _ioppr_generate_profile_info(dt_iop_order_iccprofile_info_t *pro
     cmsColorSpaceSignature rgb_color_space = cmsGetColorSpace(rgb_profile);
     if(rgb_color_space != cmsSigRgbData)
     {
-      dt_print(DT_DEBUG_PIPE,
-               "[_ioppr_generate_profile_info] working profile color space"
-               " `%c%c%c%c' not supported\n",
-               (char)(rgb_color_space>>24),
-               (char)(rgb_color_space>>16),
-               (char)(rgb_color_space>>8),
-               (char)(rgb_color_space));
+      // dt_print(DT_DEBUG_PIPE,
+      //          "[_ioppr_generate_profile_info] working profile color space"
+      //          " `%c%c%c%c' not supported\n",
+      //          (char)(rgb_color_space>>24),
+      //          (char)(rgb_color_space>>16),
+      //          (char)(rgb_color_space>>8),
+      //          (char)(rgb_color_space));
       rgb_profile = NULL;
       error = TRUE;
     }
