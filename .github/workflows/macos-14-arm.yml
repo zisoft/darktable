@@ -10,13 +10,13 @@ permissions:
 jobs:
   macOS:
     if: github.repository == 'darktable-org/darktable' || github.event_name == 'workflow_dispatch'
-    name: macOS 13 Test
+    name: macOS 14 ARM Test
     runs-on: ${{ matrix.build.os }}
     strategy:
       fail-fast: true
       matrix:
         build:
-          - { os: macos-13-arm64, xcode: "15.2", deployment: 13.5 }
+          - { os: macos-14, xcode: "15.2", deployment: 13.5 }
         compiler:
           - { compiler: XCode,   CC: cc, CXX: c++ }
         btype: [ Release ]
