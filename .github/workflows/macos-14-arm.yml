@@ -44,6 +44,9 @@ jobs:
       - name: Applications folder
         run: |
           ls -l /Applications
+      - name: Install gd
+        run: |
+          brew install gd
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
