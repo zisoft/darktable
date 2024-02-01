@@ -16,7 +16,7 @@ jobs:
       fail-fast: true
       matrix:
         build:
-          - { os: macos-14, xcode: "15.2", deployment: 13.5 }
+          - { os: macos-14, xcode: "15.2", deployment: 14.0 }
         compiler:
           - { compiler: XCode,   CC: cc, CXX: c++ }
         btype: [ Release ]
@@ -44,9 +44,6 @@ jobs:
       - name: Applications folder
         run: |
           ls -l /Applications
-      - name: Install gd
-        run: |
-          brew install gd
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -56,7 +53,7 @@ jobs:
         run: |
           brew update > /dev/null || true
           # brew upgrade || true        # No need for a very time-consuming upgrade of ALL packages
-          brew upgrade gd               # See https://github.com/Homebrew/homebrew-core/issues/141766
+          brew install gd 
           brew tap Homebrew/bundle
           cd src/.ci
           export HOMEBREW_NO_INSTALL_UPGRADE=1
@@ -89,3 +86,20 @@ jobs:
                  --conf worker_threads=4 -t 4 \
                  --conf plugins/lighttable/export/force_lcms2=FALSE \
                  --conf plugins/lighttable/export/iccintent=0
+      - name: Build macOS package
+        run: |
+          ./src/packaging/macosx/3_make_hb_darktable_package.sh
+      - name: Create DMG file
+        run: |
+          ./src/packaging/macosx/4_make_hb_darktable_dmg.sh
+      - name: Get version info
+        run: |
+          cd ${{ env.SRC_DIR }}
+          echo "VERSION=$(git describe --tags --match release-* | sed 's/^release-//;s/-/+/;s/-/~/;s/rc/~rc/')-$(uname -m)" >> $GITHUB_ENV
+      - name: Package upload
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          path: ${{ env.INSTALL_PREFIX }}/darktable-${{ env.VERSION }}.dmg
+          name: artifact-macos
+          retention-days: 2
