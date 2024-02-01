@@ -38,6 +38,9 @@ jobs:
       GENERATOR: ${{ matrix.generator }}
       TARGET: ${{ matrix.target }}
     steps:
+      - name: OS Version
+        run: |
+          uname -m
       - name: Applications folder
         run: |
           ls -l /Applications
