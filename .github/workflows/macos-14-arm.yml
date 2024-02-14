@@ -1,4 +1,4 @@
-name: macOS 13 ARM Test
+name: macOS 14 ARM Test
 
 on:
   workflow_dispatch:
