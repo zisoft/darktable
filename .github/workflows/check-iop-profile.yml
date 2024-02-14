@@ -1,0 +1,72 @@
+name: Check iop_profile.c compilation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write  # We need this to be able to cancel workflow if job fails
+
+jobs:
+  macOS:
+    if: github.repository == 'darktable-org/darktable' || github.event_name == 'workflow_dispatch'
+    name: macOS 13 Test
+    runs-on: ${{ matrix.build.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        build:
+          - { os: macos-13, xcode: "15.2", deployment: 13.5 }
+        compiler:
+          - { compiler: XCode,   CC: cc, CXX: c++ }
+        btype: [ Release ]
+        eco: [-DBINARY_PACKAGE_BUILD=ON -DBUILD_CURVE_TOOLS=ON -DBUILD_NOISE_TOOLS=ON -DUSE_GRAPHICSMAGICK=OFF -DUSE_IMAGEMAGICK=ON]
+        target:
+          - skiptest
+        generator:
+          - Ninja
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_${{ matrix.build.xcode }}.app/Contents/Developer
+      CC: ${{ matrix.compiler.CC }}
+      CXX: ${{ matrix.compiler.CXX }}
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.build.deployment }}
+      SRC_DIR: ${{ github.workspace }}/src
+      BUILD_DIR: ${{ github.workspace }}/src/build
+      INSTALL_PREFIX: ${{ github.workspace }}/src/build/macosx
+      ECO: ${{ matrix.eco }}
+      CMAKE_BUILD_TYPE: ${{ matrix.btype }}
+      GENERATOR: ${{ matrix.generator }}
+      TARGET: ${{ matrix.target }}
+    steps:
+      - name: Applications folder
+        run: |
+          ls -l /Applications
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+          path: src
+      - name: Install Base Dependencies
+        run: |
+          brew update > /dev/null || true
+          # brew upgrade || true        # No need for a very time-consuming upgrade of ALL packages
+          brew upgrade gd               # See https://github.com/Homebrew/homebrew-core/issues/141766
+          brew tap Homebrew/bundle
+          cd src/.ci
+          export HOMEBREW_NO_INSTALL_UPGRADE=1
+          brew bundle --verbose || true
+          # handle keg-only libs
+          brew link --force libomp
+          brew link --force libsoup@2
+      - name: use ImageMagick 6
+        run: |
+          brew link --overwrite --force imagemagick@6
+      - name: Cancel workflow if job fails
+        if: ${{ failure() }}
+        uses: andymckay/cancel-action@0.3
+      - name: Build and Install
+          # todo: use linker which supports --wrap, ld.bfd and ld.gold support it
+        run: |
+          cmake -E make_directory "${BUILD_DIR}";
+          cmake -E make_directory "${INSTALL_PREFIX}";
+          ./src/.ci/chk_iop_profile.sh
