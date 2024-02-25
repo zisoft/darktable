@@ -30,7 +30,7 @@ cp "$scriptDir"/macos_install_background.png ./package/.background
 try_count=0
 hdiutil_success=0
 
-while [ $hdiutil_success -ne 1 -a $try_count -lt 20 ]; do
+while [ $hdiutil_success -ne 1 -a $try_count -lt 2 ]; do
 	# Create temporary rw image
     if hdiutil create -srcfolder package -volname "${PROGN}" -fs HFS+ \
 		-fsargs "-c c=64,a=16,e=16" -format UDRW pack.temp.dmg
@@ -44,7 +44,7 @@ while [ $hdiutil_success -ne 1 -a $try_count -lt 20 ]; do
 done
 
 if [ $hdiutil_success -ne 1 -a -n "${GITHUB_RUN_ID}" ]; then
-	# Still no success after 20 attempts.
+	# Still no success after 2 attempts.
 	# If we are on github runner, kill the Xprotect service and make one
 	# final attempt.
     # see https://github.com/actions/runner-images/issues/7522
