@@ -16,7 +16,7 @@ jobs:
       fail-fast: true
       matrix:
         build:
-          - { os: macos-14, xcode: 15.3, deployment: 14.0 }
+          - { os: macos-14, xcode: 15.3, deployment: 13.5 }
         compiler:
           - { compiler: XCode,   CC: cc, CXX: c++ }
         btype: [ Release ]
