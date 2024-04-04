@@ -16,7 +16,7 @@ jobs:
       fail-fast: true
       matrix:
         build:
-          - { os: macos-13, xcode: "15.2", deployment: 13.5 }
+          - { os: macos-13, xcode: 15.2, deployment: 13.5 }
         compiler:
           - { compiler: XCode,   CC: cc, CXX: c++ }
         btype: [ Release ]
@@ -41,11 +41,16 @@ jobs:
       - name: Applications folder
         run: |
           ls -l /Applications
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: true
-          path: src
+      - name: Checkout darktable master branch
+        run: |
+          # Note that we can't make a shallow clone to reduce clone traffic and time, as we have to
+          # fetch the entire history to correctly generate the version for the disk image filename
+          git clone https://github.com/darktable-org/darktable src
+          pushd src
+          git submodule init
+          git config submodule.src/tests/integration.update none
+          git submodule update
+          popd
       - name: Install Base Dependencies
         run: |
           brew update > /dev/null || true
@@ -83,3 +88,9 @@ jobs:
                  --conf worker_threads=4 -t 4 \
                  --conf plugins/lighttable/export/force_lcms2=FALSE \
                  --conf plugins/lighttable/export/iccintent=0
+      - name: Build macOS package
+        run: |
+          ./src/packaging/macosx/3_make_hb_darktable_package.sh
+      - name: Create DMG file
+        run: |
+          ./src/packaging/macosx/4_make_hb_darktable_dmg.sh

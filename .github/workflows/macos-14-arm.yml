@@ -16,7 +16,7 @@ jobs:
       fail-fast: true
       matrix:
         build:
-          - { os: macos-14, xcode: "15.2", deployment: 14.0 }
+          - { os: macos-14, xcode: 15.3, deployment: 14.0 }
         compiler:
           - { compiler: XCode,   CC: cc, CXX: c++ }
         btype: [ Release ]
@@ -44,11 +44,16 @@ jobs:
       - name: Applications folder
         run: |
           ls -l /Applications
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: true
-          path: src
+      - name: Checkout darktable master branch
+        run: |
+          # Note that we can't make a shallow clone to reduce clone traffic and time, as we have to
+          # fetch the entire history to correctly generate the version for the disk image filename
+          git clone https://github.com/darktable-org/darktable src
+          pushd src
+          git submodule init
+          git config submodule.src/tests/integration.update none
+          git submodule update
+          popd
       - name: Install Base Dependencies
         run: |
           brew update > /dev/null || true
