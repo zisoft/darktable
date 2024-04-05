@@ -78,6 +78,9 @@ jobs:
       - name: Create DMG file
         run: |
           ./src/packaging/macosx/4_make_hb_darktable_dmg.sh
+      - name: Get architecture
+        run: |
+          echo "ARCHITECTURE=$(uname -m)" >> $GITHUB_ENV
       - name: Get version info
         run: |
           cd ${{ env.SRC_DIR }}
@@ -86,6 +89,6 @@ jobs:
         if: ${{ success() }}
         uses: actions/upload-artifact@v4
         with:
-          path: ${{ env.INSTALL_PREFIX }}/darktable-${{ env.VERSION }}.dmg
-          name: artifact-macos
+          path: ${{ env.INSTALL_PREFIX }}/darktable-${{ env.VERSION }}-${{ env.ARCHITECTURE }}.dmg
+          name: name: darktable-${{ env.VERSION }}-${{ env.ARCHITECTURE }}.dmg
           retention-days: 2
