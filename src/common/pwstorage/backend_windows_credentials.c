@@ -24,22 +24,25 @@
 static void _logError(const char *action)
 {
   const int error = GetLastError();
-  LPSTR message = NULL;
+  wchar_t *wmessage = NULL;
 
-  FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                 NULL,
-                 error,
-                 MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT),
-                 (LPSTR)&message,
-                 0,
-                 NULL);
+  FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                NULL,
+                error,
+                MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT),
+                (LPWSTR)&wmessage,
+                0,
+                NULL);
+
+  gchar *message = g_utf16_to_utf8(wmessage, -1, NULL, NULL, NULL);
 
   dt_print(DT_DEBUG_PWSTORAGE,
            "[%s] ERROR: failed to complete windows_credential call: %s\n",
            action,
            message);
 
-  LocalFree(message);
+  g_free(message);
+  LocalFree(wmessage);
 }
 
 const backend_windows_credentials_context_t *dt_pwstorage_windows_credentials_new()
@@ -113,30 +116,41 @@ gboolean dt_pwstorage_windows_credentials_set(const backend_windows_credentials_
     gchar *username = g_strdup((gchar *)g_hash_table_lookup(v_attributes, "username"));
     gchar *password = g_strdup((gchar *)g_hash_table_lookup(v_attributes, "password"));
 
+    wchar_t *wserver = g_utf8_to_utf16(server, -1, NULL, NULL, NULL);
+    wchar_t *wusername = g_utf8_to_utf16(username, -1, NULL, NULL, NULL);
+    wchar_t *wpassword = g_utf8_to_utf16(password, -1, NULL, NULL, NULL);
+
+    g_free(server);
+    g_free(username);
+    g_free(password);
+
     gchar *target_name = g_strconcat("darktable_", slot, "/", server, NULL);
+    wchar_t *wtarget_name = g_utf8_to_utf16(target_name, -1, NULL, NULL, NULL);
+    g_free(target_name);
 
     // create/update entry
-    const DWORD cbPassword = (wcslen((wchar_t *)password) + 1);
+    const DWORD cbPassword = (wcslen(wpassword) + 1) * sizeof(wchar_t);
 
-    CREDENTIALA cred = { 0 };
-    cred.TargetName = (LPSTR)target_name;
-    cred.Comment = (LPSTR)server;
+    CREDENTIAL cred = { 0 };
+
+    cred.TargetName = wtarget_name;
+    cred.Comment = wserver;
     cred.Type = CRED_TYPE_GENERIC;
     cred.Persist = CRED_PERSIST_LOCAL_MACHINE;
-    cred.UserName = (LPSTR)username;
+    cred.UserName = wusername;
     cred.CredentialBlobSize = cbPassword;
-    cred.CredentialBlob = (LPBYTE)password;
+    cred.CredentialBlob = (LPBYTE)wpassword;
 
-    ok = CredWriteA(&cred, 0);
+    ok = CredWrite(&cred, 0);
     if(!ok)
     {
       _logError("pwstorage_windows_credentials_set");
     }
 
-    g_free(server);
-    g_free(username);
-    g_free(password);
-    g_free(target_name);
+    g_free(wserver);
+    g_free(wusername);
+    g_free(wpassword);
+    g_free(wtarget_name);
   }
 
   return ok;
@@ -148,29 +162,35 @@ GHashTable *dt_pwstorage_windows_credentials_get(const backend_windows_credentia
   GHashTable *table = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
 
   gchar *target_name = g_strconcat("darktable_", slot, "/*", NULL);
+  wchar_t *wtarget_name = g_utf8_to_utf16(target_name, -1, NULL, NULL, NULL);
+  g_free(target_name);
 
   DWORD count = 0;
-  PCREDENTIALA *pcreds = NULL;
-  const gboolean ok = CredEnumerateA((LPCSTR)target_name,
-                                     0,
-                                     &count,
-                                     &pcreds);
+  PCREDENTIAL *pcreds = NULL;
+  const gboolean ok = CredEnumerate(wtarget_name,
+                                    0,
+                                    &count,
+                                    &pcreds);
 
   if(ok)
   {
     for(int i = 0; i < count; ++i)
     {
-      const PCREDENTIALA pcred = pcreds[i];
+      const PCREDENTIAL pcred = pcreds[i];
+
+      gchar *server = g_utf16_to_utf8(pcred->Comment, -1, NULL, NULL, NULL);
+      gchar *username = g_utf16_to_utf8(pcred->UserName, -1, NULL, NULL, NULL);
+      gchar *password = g_utf16_to_utf8((wchar_t *)pcred->CredentialBlob, -1, NULL, NULL, NULL);
 
       // build JSON
       JsonBuilder *json_builder = json_builder_new();
       json_builder_begin_object(json_builder);
       json_builder_set_member_name(json_builder, "server");
-      json_builder_add_string_value(json_builder, (gchar *)pcred->Comment);
+      json_builder_add_string_value(json_builder, server);
       json_builder_set_member_name(json_builder, "username");
-      json_builder_add_string_value(json_builder, (gchar *)pcred->UserName);
+      json_builder_add_string_value(json_builder, username);
       json_builder_set_member_name(json_builder, "password");
-      json_builder_add_string_value(json_builder, (gchar *)pcred->CredentialBlob);
+      json_builder_add_string_value(json_builder, password);
       json_builder_end_object(json_builder);
 
       // generate JSON
@@ -187,6 +207,10 @@ GHashTable *dt_pwstorage_windows_credentials_get(const backend_windows_credentia
                json_data);
 
       g_hash_table_insert(table, g_strdup((gchar *)pcred->Comment), g_strdup(json_data));
+
+      g_free(server);
+      g_free(username);
+      g_free(password);
     }
   }
   else
@@ -195,7 +219,7 @@ GHashTable *dt_pwstorage_windows_credentials_get(const backend_windows_credentia
   }
 
   CredFree(pcreds);
-  g_free(target_name);
+  g_free(wtarget_name);
 
   return table;
 }
