@@ -57,6 +57,7 @@ FILE(GLOB SOURCE_FILES
   "common/iop_group.c"
   "common/iop_order.c"
   "common/iop_profile.c"
+  "common/json.c"
   "common/l10n.c"
   "common/locallaplacian.c"
   "common/locallaplaciancl.c"
