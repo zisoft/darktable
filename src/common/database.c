@@ -49,7 +49,7 @@
 // whenever _create_*_schema() gets changed you HAVE to bump this version and add an update path to
 // _upgrade_*_schema_step()!
 #define CURRENT_DATABASE_VERSION_LIBRARY 55
-#define CURRENT_DATABASE_VERSION_DATA    10
+#define CURRENT_DATABASE_VERSION_DATA    11
 
 #define USE_NESTED_TRANSACTIONS
 #define MAX_NESTED_TRANSACTIONS 5
@@ -3138,6 +3138,15 @@ static int _upgrade_data_schema_step(dt_database_t *db, int version)
 
     new_version = 10;
   }
+  else if(version == 10)
+  {
+    TRY_EXEC("ALTER TABLE data.presets ADD COLUMN op_params_json VARCHAR",
+             "[init] can't add op_params_json column\n");
+    TRY_EXEC("ALTER TABLE data.presets ADD COLUMN blendop_params_json VARCHAR",
+             "[init] can't add blendop_params_json column\n");
+
+    new_version = 11;
+  }
   else
     new_version = version; // should be the fallback so that calling code sees that we are in an infinite loop
 
@@ -3545,7 +3554,8 @@ static void _create_data_schema(dt_database_t *db)
                            "exposure_min REAL, exposure_max REAL, "
                            "aperture_min REAL, aperture_max REAL, focal_length_min REAL, "
                            "focal_length_max REAL, writeprotect INTEGER, "
-                           "autoapply INTEGER, filter INTEGER, def INTEGER, format INTEGER)",
+                           "autoapply INTEGER, filter INTEGER, def INTEGER, format INTEGER, "
+                           "op_params_json VARCHAR, blendop_params_json VARCHAR)",
                NULL, NULL, NULL);
   sqlite3_exec(db->handle, "CREATE UNIQUE INDEX data.presets_idx ON presets (name, operation, op_version)",
                NULL, NULL, NULL);
