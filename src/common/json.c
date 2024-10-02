@@ -45,6 +45,12 @@ void dt_json_add_string(JsonBuilder *json_builder, const gchar *key, const gchar
   json_builder_add_string_value(json_builder, value);
 }
 
+void dt_json_add_float(JsonBuilder *json_builder, const gchar *key, const float value)
+{
+  json_builder_set_member_name(json_builder, key);
+  json_builder_add_double_value(json_builder, (gdouble)value);
+}
+
 void dt_json_add_int_from_dt_conf(JsonBuilder *json_builder, const gchar *config_string)
 {
   const gchar *key = _get_key_from_config_string(config_string);
@@ -61,6 +67,12 @@ void dt_json_add_string_from_dt_conf(JsonBuilder *json_builder, const gchar *con
 {
   const gchar *key = _get_key_from_config_string(config_string);
   dt_json_add_string(json_builder, key, dt_conf_get_string_const(config_string));
+}
+
+void dt_json_add_float_from_dt_conf(JsonBuilder *json_builder, const gchar *config_string)
+{
+  const gchar *key = _get_key_from_config_string(config_string);
+  dt_json_add_float(json_builder, key, dt_conf_get_float(config_string));
 }
 
 int32_t dt_json_get_int(JsonReader *json_reader, const gchar *key)
@@ -83,6 +95,14 @@ const gchar *dt_json_get_string(JsonReader *json_reader, const gchar *key)
 {
   json_reader_read_member(json_reader, key);
   const gchar *value = json_reader_get_string_value(json_reader);
+  json_reader_end_element(json_reader);
+  return value;
+}
+
+float dt_json_get_float(JsonReader *json_reader, const gchar *key)
+{
+  json_reader_read_member(json_reader, key);
+  const float value = (float)json_reader_get_double_value(json_reader);
   json_reader_end_element(json_reader);
   return value;
 }

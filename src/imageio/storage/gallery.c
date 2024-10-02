@@ -21,6 +21,7 @@
 #include "common/file_location.h"
 #include "common/image.h"
 #include "common/image_cache.h"
+#include "common/json.h"
 #include "common/metadata.h"
 #include "common/utility.h"
 #include "common/variables.h"
@@ -632,6 +633,25 @@ void *get_params(dt_imageio_module_storage_t *self)
   g_strlcpy(d->title, text, sizeof(d->title));
 
   return d;
+}
+
+gchar *get_params_json(dt_imageio_module_storage_t *self)
+{
+  JsonBuilder *json_builder = json_builder_new();
+  json_builder_begin_object(json_builder);
+  dt_json_add_string_from_dt_conf(json_builder, "plugins/imageio/storage/gallery/file_directory");
+  dt_json_add_string_from_dt_conf(json_builder, "plugins/imageio/storage/gallery/title");
+  json_builder_end_object(json_builder);
+
+  // generate JSON
+  JsonGenerator *json_generator = json_generator_new();
+  json_generator_set_root(json_generator, json_builder_get_root(json_builder));
+  gchar *json_data = json_generator_to_data(json_generator, 0);
+
+  g_object_unref(json_generator);
+  g_object_unref(json_builder);
+
+  return json_data;
 }
 
 void free_params(dt_imageio_module_storage_t *self,

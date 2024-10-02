@@ -22,6 +22,7 @@
 #include "common/darktable.h"
 #include "common/debug.h"
 #include "common/styles.h"
+#include "common/json.h"
 #include "control/conf.h"
 #include "control/control.h"
 #include "control/jobs.h"
@@ -2312,6 +2313,78 @@ int set_params(dt_lib_module_t *self,
     res += fmod->set_params(fmod, fdata, fsize);
   return res;
 }
+
+int set_params_json(dt_lib_module_t *self, const gchar* json)
+{
+  JsonParser *json_parser = json_parser_new();
+
+  if(json_parser_load_from_data(json_parser, json, -1, NULL) == FALSE)
+  {              
+    g_object_unref(json_parser);
+    return 1;
+  }
+
+  // Read JSON
+  JsonNode *json_root = json_parser_get_root(json_parser);
+  JsonReader *json_reader = json_reader_new(json_root);
+
+  const int32_t width = dt_json_get_int(json_reader, "width");
+  const int32_t height = dt_json_get_int(json_reader, "height");
+  const gchar *size = dt_json_get_string(json_reader, "resizing_factor");
+  const gboolean high_quality_processing = dt_json_get_bool(json_reader, "high_quality_processing");
+
+  printf("%d, %d, %s, %d\n", width, height, size, high_quality_processing);
+
+  return 0;
+}
+
+gchar *get_params_json(dt_lib_module_t *self)
+{
+  dt_lib_export_t *d = (dt_lib_export_t *)self->data;
+  // get storage and format
+  dt_imageio_module_format_t *mformat = dt_imageio_get_format();
+  dt_imageio_module_storage_t *mstorage = dt_imageio_get_storage();
+  if(!mformat || !mstorage) return NULL;
+
+  gchar *format_params = mformat->get_params_json(mformat);
+  gchar *storage_params = mstorage->get_params_json(mstorage);
+
+  JsonBuilder *json_builder = json_builder_new();
+  json_builder_begin_object(json_builder);
+  dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "iccintent");
+  dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "icctype");
+  dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "width");
+  dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "height");
+  dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "upscale");
+  dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "dimensions_type");
+  dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "print_dpi");
+  dt_json_add_string_from_dt_conf(json_builder, CONFIG_PREFIX "resizing_factor");
+  dt_json_add_bool_from_dt_conf(json_builder, CONFIG_PREFIX "high_quality_processing");
+  dt_json_add_bool_from_dt_conf(json_builder, CONFIG_PREFIX "export_masks");
+  dt_json_add_string_from_dt_conf(json_builder, CONFIG_PREFIX "iccprofile");
+  dt_json_add_string_from_dt_conf(json_builder, CONFIG_PREFIX "style");
+  dt_json_add_bool_from_dt_conf(json_builder, CONFIG_PREFIX "style_append");
+  dt_json_add_string(json_builder, "metadata_export", d->metadata_export ? d->metadata_export : "");
+  dt_json_add_string(json_builder, "format", mformat->plugin_name);
+  dt_json_add_string(json_builder, "format_params", format_params);
+  dt_json_add_string(json_builder, "storage", mstorage->plugin_name);
+  dt_json_add_string(json_builder, "storage_params", storage_params);
+  json_builder_end_object(json_builder);
+
+  g_free(format_params);
+  g_free(storage_params);
+
+  // generate JSON
+  JsonGenerator *json_generator = json_generator_new();
+  json_generator_set_root(json_generator, json_builder_get_root(json_builder));
+  gchar *json_data = json_generator_to_data(json_generator, 0);
+
+  g_object_unref(json_generator);
+  g_object_unref(json_builder);
+
+  return json_data;
+}
+
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py

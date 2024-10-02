@@ -20,6 +20,7 @@
 #include "common/file_location.h"
 #include "common/image.h"
 #include "common/image_cache.h"
+#include "common/json.h"
 #include "control/conf.h"
 #include "control/control.h"
 #include "dtgtk/button.h"
@@ -213,6 +214,11 @@ void *get_params(dt_imageio_module_storage_t *self)
 {
   dt_imageio_email_t *d = (dt_imageio_email_t *)g_malloc0(sizeof(dt_imageio_email_t));
   return d;
+}
+
+gchar *get_params_json(dt_imageio_module_storage_t *self)
+{
+  return g_strdup("{}");
 }
 
 int set_params(dt_imageio_module_storage_t *self,

@@ -20,6 +20,7 @@
 #include "bauhaus/bauhaus.h"
 #include "common/colorspaces.h"
 #include "common/darktable.h"
+#include "common/json.h"
 #include "common/variables.h"
 #include "control/control.h"
 #include "dtgtk/button.h"
@@ -763,6 +764,34 @@ void *get_params(dt_imageio_module_format_t *self)
   }
 
   return d;
+}
+
+gchar *get_params_json(dt_imageio_module_format_t *self)
+{
+  JsonBuilder *json_builder = json_builder_new();
+  json_builder_begin_object(json_builder);
+  dt_json_add_string_from_dt_conf(json_builder, "plugins/imageio/format/pdf/title");
+  dt_json_add_string_from_dt_conf(json_builder, "plugins/imageio/format/pdf/border");
+  dt_json_add_string_from_dt_conf(json_builder, "plugins/imageio/format/pdf/size");
+  dt_json_add_int_from_dt_conf(json_builder, "plugins/imageio/format/pdf/bpp");
+  dt_json_add_int_from_dt_conf(json_builder, "plugins/imageio/format/pdf/compression");
+  dt_json_add_float_from_dt_conf(json_builder, "plugins/imageio/format/pdf/dpi");
+  dt_json_add_bool_from_dt_conf(json_builder, "plugins/imageio/format/pdf/icc");
+  dt_json_add_int_from_dt_conf(json_builder, "plugins/imageio/format/pdf/mode");
+  dt_json_add_int_from_dt_conf(json_builder, "plugins/imageio/format/pdf/orientation");
+  dt_json_add_int_from_dt_conf(json_builder, "plugins/imageio/format/pdf/pages");
+  dt_json_add_bool_from_dt_conf(json_builder, "plugins/imageio/format/pdf/rotate");
+  json_builder_end_object(json_builder);
+
+  // generate JSON
+  JsonGenerator *json_generator = json_generator_new();
+  json_generator_set_root(json_generator, json_builder_get_root(json_builder));
+  gchar *json_data = json_generator_to_data(json_generator, 0);
+
+  g_object_unref(json_generator);
+  g_object_unref(json_builder);
+
+  return json_data;
 }
 
 // in normal operations we free these after exporting the last image, but when an export

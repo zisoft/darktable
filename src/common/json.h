@@ -28,17 +28,23 @@ void dt_json_add_bool(JsonBuilder *json_builder, const gchar *key, const gboolea
 
 void dt_json_add_string(JsonBuilder *json_builder, const gchar *key, const gchar *value);
 
+void dt_json_add_float(JsonBuilder *json_builder, const gchar *key, const float value);
+
 void dt_json_add_int_from_dt_conf(JsonBuilder *json_builder, const gchar *config_string);
 
 void dt_json_add_bool_from_dt_conf(JsonBuilder *json_builder, const gchar *config_string);
 
 void dt_json_add_string_from_dt_conf(JsonBuilder *json_builder, const gchar *config_string);
 
+void dt_json_add_float_from_dt_conf(JsonBuilder *json_builder, const gchar *config_string);
+
 int32_t dt_json_get_int(JsonReader *json_reader, const gchar *key);
 
 gboolean dt_json_get_bool(JsonReader *json_reader, const gchar *key);
 
 const gchar *dt_json_get_string(JsonReader *json_reader, const gchar *key);
+
+float dt_json_get_float(JsonReader *json_reader, const gchar *key);
 
 G_END_DECLS
 

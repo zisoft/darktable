@@ -17,6 +17,7 @@
 */
 
 #include "common/darktable.h"
+#include "common/json.h"
 #include "imageio/imageio_common.h"
 #include "imageio/imageio_module.h"
 #include "imageio/format/imageio_format_api.h"
@@ -73,6 +74,11 @@ void *get_params(dt_imageio_module_format_t *self)
 {
   dt_imageio_module_data_t *d = (dt_imageio_module_data_t *)calloc(1, sizeof(dt_imageio_module_data_t));
   return d;
+}
+
+gchar *get_params_json(dt_imageio_module_format_t *self)
+{
+  return g_strdup("{}");
 }
 
 void free_params(dt_imageio_module_format_t *self, dt_imageio_module_data_t *params)
