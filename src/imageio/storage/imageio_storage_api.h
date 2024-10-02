@@ -84,6 +84,8 @@ OPTIONAL(void *, legacy_params,
          size_t *new_size);
 REQUIRED(size_t, params_size, struct dt_imageio_module_storage_t *self);
 REQUIRED(void *, get_params, struct dt_imageio_module_storage_t *self);
+/* get the params json string. return value is owned by the caller */
+REQUIRED(gchar *, get_params_json, struct dt_imageio_module_storage_t *self);
 REQUIRED(void, free_params, struct dt_imageio_module_storage_t *self, struct dt_imageio_module_data_t *data);
 REQUIRED(int, set_params, struct dt_imageio_module_storage_t *self, const void *params, const int size);
 

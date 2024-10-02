@@ -100,6 +100,10 @@ OPTIONAL(void, set_preferences, void *menu, struct dt_lib_module_t *self);
 /** check if the module can autoapply presets. Default is FALSE */
 DEFAULT(gboolean, preset_autoapply, struct dt_lib_module_t *self);
 
+OPTIONAL(int, set_params_json, struct dt_lib_module_t *self, const gchar *json);
+/* get the params json. return value is owned by the caller */
+OPTIONAL(gchar *, get_params_json, struct dt_lib_module_t *self);
+
 #ifdef FULL_API_H
 
 #pragma GCC visibility pop
