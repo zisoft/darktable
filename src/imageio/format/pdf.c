@@ -766,10 +766,11 @@ void *get_params(dt_imageio_module_format_t *self)
   return d;
 }
 
-gchar *get_params_json(dt_imageio_module_format_t *self)
+void get_params_json(dt_imageio_module_format_t *self, JsonBuilder *json_builder)
 {
-  JsonBuilder *json_builder = json_builder_new();
+  json_builder_set_member_name(json_builder, "format_params");
   json_builder_begin_object(json_builder);
+  dt_json_add_int(json_builder, "version", self->version());
   dt_json_add_string_from_dt_conf(json_builder, "plugins/imageio/format/pdf/title");
   dt_json_add_string_from_dt_conf(json_builder, "plugins/imageio/format/pdf/border");
   dt_json_add_string_from_dt_conf(json_builder, "plugins/imageio/format/pdf/size");
@@ -782,16 +783,49 @@ gchar *get_params_json(dt_imageio_module_format_t *self)
   dt_json_add_int_from_dt_conf(json_builder, "plugins/imageio/format/pdf/pages");
   dt_json_add_bool_from_dt_conf(json_builder, "plugins/imageio/format/pdf/rotate");
   json_builder_end_object(json_builder);
+}
 
-  // generate JSON
-  JsonGenerator *json_generator = json_generator_new();
-  json_generator_set_root(json_generator, json_builder_get_root(json_builder));
-  gchar *json_data = json_generator_to_data(json_generator, 0);
+int set_params_json(dt_imageio_module_format_t *self, JsonReader *json_reader)
+{
+  pdf_t *g = (pdf_t *)self->gui_data;
 
-  g_object_unref(json_generator);
-  g_object_unref(json_builder);
+  json_reader_read_member(json_reader, "format_params");
+  const gchar *title = dt_json_get_string(json_reader, "title");
+  const gchar *border = dt_json_get_string(json_reader, "border");
+  const gchar *size = dt_json_get_string(json_reader, "size");
+  const uint32_t bpp = dt_json_get_int(json_reader, "bpp");
+  const uint32_t compression = dt_json_get_int(json_reader, "compression");
+  const float dpi = dt_json_get_float(json_reader, "dpi");
+  const gboolean icc = dt_json_get_bool(json_reader, "icc");
+  const uint32_t mode = dt_json_get_int(json_reader, "mode");
+  const uint32_t orientation = dt_json_get_int(json_reader, "orientation");
+  const uint32_t pages = dt_json_get_int(json_reader, "pages");
+  const gboolean rotate = dt_json_get_bool(json_reader, "rotate");
+  json_reader_end_element(json_reader);
 
-  return json_data;
+  gtk_entry_set_text(g->title, title);
+  gtk_entry_set_text(g->border, border);
+  dt_bauhaus_combobox_set(g->compression, compression);
+  gtk_spin_button_set_value(g->dpi, dpi);
+  dt_bauhaus_combobox_set(g->icc, icc);
+  dt_bauhaus_combobox_set(g->mode, mode);
+  dt_bauhaus_combobox_set(g->orientation, orientation);
+  dt_bauhaus_combobox_set(g->pages, pages);
+  dt_bauhaus_combobox_set(g->rotate, rotate);
+  _set_paper_size(self, size);
+
+  dt_conf_set_string("plugins/imageio/format/pdf/title", title);
+  dt_conf_set_string("plugins/imageio/format/pdf/border", border);
+  dt_conf_set_int("plugins/imageio/format/pdf/bpp", bpp);
+  dt_conf_set_int("plugins/imageio/format/pdf/compression", compression);
+  dt_conf_set_float("plugins/imageio/format/pdf/dpi", dpi);
+  dt_conf_set_bool("plugins/imageio/format/pdf/icc", icc);
+  dt_conf_set_int("plugins/imageio/format/pdf/mode", mode);
+  dt_conf_set_int("plugins/imageio/format/pdf/orientation", orientation);
+  dt_conf_set_int("plugins/imageio/format/pdf/pages", pages);
+  dt_conf_set_bool("plugins/imageio/format/pdf/rotate", rotate);
+
+  return 0;
 }
 
 // in normal operations we free these after exporting the last image, but when an export

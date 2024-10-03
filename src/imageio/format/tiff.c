@@ -754,10 +754,11 @@ void *get_params(dt_imageio_module_format_t *self)
   return d;
 }
 
-gchar *get_params_json(dt_imageio_module_format_t *self)
+void get_params_json(dt_imageio_module_format_t *self, JsonBuilder *json_builder)
 {
-  JsonBuilder *json_builder = json_builder_new();
+  json_builder_set_member_name(json_builder, "format_params");
   json_builder_begin_object(json_builder);
+  dt_json_add_int(json_builder, "version", self->version());
   dt_json_add_int_from_dt_conf(json_builder, "plugins/imageio/format/tiff/bpp");
 
   int pixelformat;
@@ -769,18 +770,30 @@ gchar *get_params_json(dt_imageio_module_format_t *self)
   dt_json_add_int(json_builder, "pixelformat", pixelformat);
 
   dt_json_add_int_from_dt_conf(json_builder, "plugins/imageio/format/tiff/compress");
+  dt_json_add_int_from_dt_conf(json_builder, "plugins/imageio/format/tiff/compresslevel");
   dt_json_add_bool_from_dt_conf(json_builder, "plugins/imageio/format/tiff/shortfile");
   json_builder_end_object(json_builder);
+}
 
-  // generate JSON
-  JsonGenerator *json_generator = json_generator_new();
-  json_generator_set_root(json_generator, json_builder_get_root(json_builder));
-  gchar *json_data = json_generator_to_data(json_generator, 0);
+int set_params_json(dt_imageio_module_format_t *self, JsonReader *json_reader)
+{
+  const dt_imageio_tiff_gui_t *g = (dt_imageio_tiff_gui_t *)self->gui_data;
 
-  g_object_unref(json_generator);
-  g_object_unref(json_builder);
+  json_reader_read_member(json_reader, "format_params");
+  const uint32_t bpp = dt_json_get_int(json_reader, "bpp");
+  const uint32_t pixelformat = dt_json_get_int(json_reader, "pixelformat");
+  const uint32_t compress = dt_json_get_int(json_reader, "compress");
+  const uint32_t compresslevel = dt_json_get_int(json_reader, "compress");
+  const gboolean shortfile = dt_json_get_bool(json_reader, "shortfile");
+  json_reader_end_element(json_reader);
 
-  return json_data;
+  dt_bauhaus_combobox_set(g->bpp, bpp == 16 ? 1 : bpp == 32 ? 2 : 0);
+  dt_bauhaus_combobox_set(g->pixelformat, pixelformat & 1);
+  dt_bauhaus_combobox_set(g->compress, compress);
+  dt_bauhaus_slider_set(g->compresslevel, compresslevel);
+  dt_bauhaus_combobox_set(g->shortfiles, shortfile);
+
+  return 0;
 }
 
 void free_params(dt_imageio_module_format_t *self, dt_imageio_module_data_t *params)

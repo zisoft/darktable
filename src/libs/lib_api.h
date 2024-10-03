@@ -93,16 +93,15 @@ OPTIONAL(int, position, const struct dt_lib_module_t *self);
 OPTIONAL(void *, legacy_params, struct dt_lib_module_t *self, const void *const old_params, const size_t old_params_size,
                     const int old_version, int *new_version, size_t *new_size);
 OPTIONAL(void *,get_params, struct dt_lib_module_t *self, int *size);
+/* get the params json. return value is owned by the caller */
+OPTIONAL(gchar *, get_params_json, struct dt_lib_module_t *self);
 OPTIONAL(int, set_params, struct dt_lib_module_t *self, const void *params, int size);
+OPTIONAL(int, set_params_json, struct dt_lib_module_t *self, const gchar *json);
 OPTIONAL(void, init_presets, struct dt_lib_module_t *self);
 OPTIONAL(void, manage_presets, struct dt_lib_module_t *self);
 OPTIONAL(void, set_preferences, void *menu, struct dt_lib_module_t *self);
 /** check if the module can autoapply presets. Default is FALSE */
 DEFAULT(gboolean, preset_autoapply, struct dt_lib_module_t *self);
-
-OPTIONAL(int, set_params_json, struct dt_lib_module_t *self, const gchar *json);
-/* get the params json. return value is owned by the caller */
-OPTIONAL(gchar *, get_params_json, struct dt_lib_module_t *self);
 
 #ifdef FULL_API_H
 

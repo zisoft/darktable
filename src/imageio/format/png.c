@@ -588,10 +588,11 @@ void *get_params(dt_imageio_module_format_t *self)
   return d;
 }
 
-gchar *get_params_json(dt_imageio_module_format_t *self)
+void get_params_json(dt_imageio_module_format_t *self, JsonBuilder *json_builder)
 {
-  JsonBuilder *json_builder = json_builder_new();
+  json_builder_set_member_name(json_builder, "format_params");
   json_builder_begin_object(json_builder);
+  dt_json_add_int(json_builder, "version", self->version());
   dt_json_add_int_from_dt_conf(json_builder, "plugins/imageio/format/png/bpp");
 
   // PNG compression level might actually be zero!
@@ -605,16 +606,25 @@ gchar *get_params_json(dt_imageio_module_format_t *self)
   }
   dt_json_add_int(json_builder, "compression", compression);
   json_builder_end_object(json_builder);
+}
 
-  // generate JSON
-  JsonGenerator *json_generator = json_generator_new();
-  json_generator_set_root(json_generator, json_builder_get_root(json_builder));
-  gchar *json_data = json_generator_to_data(json_generator, 0);
+int set_params_json(dt_imageio_module_format_t *self, JsonReader *json_reader)
+{
+  const dt_imageio_png_gui_t *g = (dt_imageio_png_gui_t *)self->gui_data;
 
-  g_object_unref(json_generator);
-  g_object_unref(json_builder);
+  json_reader_read_member(json_reader, "format_params");
+  const uint32_t bpp = dt_json_get_int(json_reader, "bpp");
+  const uint32_t compression = dt_json_get_int(json_reader, "compression");
+  json_reader_end_element(json_reader);
 
-  return json_data;
+  if(bpp < 12)
+    dt_bauhaus_combobox_set(g->bit_depth, 0);
+  else
+    dt_bauhaus_combobox_set(g->bit_depth, 1);
+  dt_conf_set_int("plugins/imageio/format/png/bpp", bpp);
+  dt_bauhaus_slider_set(g->compression, compression);
+  dt_conf_set_int("plugins/imageio/format/png/compression", compression);
+  return 0;
 }
 
 void free_params(dt_imageio_module_format_t *self,

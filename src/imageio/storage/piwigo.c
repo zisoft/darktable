@@ -1558,23 +1558,51 @@ void *get_params(dt_imageio_module_storage_t *self)
   return p;
 }
 
-gchar *get_params_json(dt_imageio_module_storage_t *self)
+void get_params_json(dt_imageio_module_storage_t *self, JsonBuilder *json_builder)
 {
-  JsonBuilder *json_builder = json_builder_new();
+  dt_storage_piwigo_gui_data_t *g = self->gui_data;
+
+  json_builder_set_member_name(json_builder, "storage_params");
   json_builder_begin_object(json_builder);
   dt_json_add_string_from_dt_conf(json_builder, "pplugins/imageio/storage/export/piwigo/filename_pattern");
   dt_json_add_int_from_dt_conf(json_builder, "storage/piwigo/conflict");
+  dt_json_add_int(json_builder, "privacy", dt_bauhaus_combobox_get(g->permission_list));
   json_builder_end_object(json_builder);
+}
 
-  // generate JSON
-  JsonGenerator *json_generator = json_generator_new();
-  json_generator_set_root(json_generator, json_builder_get_root(json_builder));
-  gchar *json_data = json_generator_to_data(json_generator, 0);
+int set_params_json(dt_imageio_module_storage_t *self, JsonReader *json_reader)
+{
+  dt_storage_piwigo_gui_data_t *g = self->gui_data;
 
-  g_object_unref(json_generator);
-  g_object_unref(json_builder);
+  json_reader_read_member(json_reader, "storage_params");
+  const gchar *filename_pattern = dt_json_get_string(json_reader, "filename_pattern");
+  const int conflict = dt_json_get_int(json_reader, "conflict");
+  const dt_storage_piwigo_permissions_t privacy = dt_json_get_int(json_reader, "privacy");
+  json_reader_end_element(json_reader);
 
-  return json_data;
+  gtk_entry_set_text(GTK_ENTRY(g->filename_pattern_entry), filename_pattern);
+  dt_bauhaus_combobox_set(g->conflict_action, conflict);
+
+  switch(privacy)
+  {
+    case DT_PIWIGO_PERMISSION_EVERYONE:
+      dt_bauhaus_combobox_set(g->permission_list, 0);
+      break;
+    case DT_PIWIGO_PERMISSION_CONTACTS:
+      dt_bauhaus_combobox_set(g->permission_list, 1);
+      break;
+    case DT_PIWIGO_PERMISSION_FRIENDS:
+      dt_bauhaus_combobox_set(g->permission_list, 2);
+      break;
+    case DT_PIWIGO_PERMISSION_FAMILY:
+      dt_bauhaus_combobox_set(g->permission_list, 3);
+      break;
+    default: // you / admin
+      dt_bauhaus_combobox_set(g->permission_list, 4);
+      break;
+  }
+
+  return 0;
 }
 
 int set_params(dt_imageio_module_storage_t *self,

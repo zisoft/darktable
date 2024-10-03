@@ -216,9 +216,17 @@ void *get_params(dt_imageio_module_storage_t *self)
   return d;
 }
 
-gchar *get_params_json(dt_imageio_module_storage_t *self)
+void get_params_json(dt_imageio_module_storage_t *self, JsonBuilder *json_builder)
 {
-  return g_strdup("{}");
+  json_builder_set_member_name(json_builder, "storage_params");
+  json_builder_begin_object(json_builder);
+  dt_json_add_int(json_builder, "version", self->version());
+  json_builder_end_object(json_builder);
+}
+
+int set_params_json(dt_imageio_module_storage_t *self, JsonReader *json_reader)
+{
+  return 0;
 }
 
 int set_params(dt_imageio_module_storage_t *self,

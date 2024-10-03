@@ -154,13 +154,19 @@ static void menuitem_update_preset(GtkMenuItem *menuitem,
                                   _("do you really want to update the preset `%s'?"),
                                   name))
   {
+    gchar *params_json = NULL;
+    if(minfo->module->get_params_json)
+    {
+      params_json = minfo->module->get_params_json(minfo->module);
+    }
+
     // commit all the module fields
     sqlite3_stmt *stmt;
     // clang-format off
     DT_DEBUG_SQLITE3_PREPARE_V2(dt_database_get(darktable.db),
                                 "UPDATE data.presets"
-                                " SET op_version=?2, op_params=?3"
-                                " WHERE name=?4 AND operation=?1",
+                                " SET op_version=?2, op_params=?3, op_params_json=?4"
+                                " WHERE name=?5 AND operation=?1",
                                 -1, &stmt, NULL);
     // clang-format on
 
@@ -169,7 +175,8 @@ static void menuitem_update_preset(GtkMenuItem *menuitem,
     DT_DEBUG_SQLITE3_BIND_INT(stmt, 2, minfo->version);
     DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 3, minfo->params, minfo->params_size,
                                SQLITE_TRANSIENT);
-    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 4, name, -1, SQLITE_TRANSIENT);
+    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 4, params_json, -1, SQLITE_TRANSIENT);
+    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 5, name, -1, SQLITE_TRANSIENT);
     sqlite3_step(stmt);
     sqlite3_finalize(stmt);
     DT_CONTROL_SIGNAL_RAISE(DT_SIGNAL_PRESETS_CHANGED,
@@ -330,7 +337,7 @@ gboolean dt_lib_presets_apply(const gchar *preset,
   // clang-format off
   DT_DEBUG_SQLITE3_PREPARE_V2(
       dt_database_get(darktable.db),
-      "SELECT op_params, writeprotect"
+      "SELECT op_params, op_params_json, writeprotect"
       " FROM data.presets"
       " WHERE operation = ?1 AND op_version = ?2 AND name = ?3",
       -1, &stmt, NULL);
@@ -355,9 +362,23 @@ gboolean dt_lib_presets_apply(const gchar *preset,
           gchar *tx = g_strdup_printf("plugins/darkroom/%s/last_preset", module_name);
           dt_conf_set_string(tx, preset);
           g_free(tx);
+    const char *json = (char *)sqlite3_column_text(stmt, 1);
+    int writeprotect = sqlite3_column_int(stmt, 2);
+
+    for(const GList *it = darktable.lib->plugins; it; it = g_list_next(it))
+    {
+      dt_lib_module_t *module = (dt_lib_module_t *)it->data;
+      if(!strncmp(module->plugin_name, module_name, 128))
+      {
+        gchar *tx = g_strdup_printf("plugins/darkroom/%s/last_preset", module_name);
+        dt_conf_set_string(tx, preset);
+        g_free(tx);
+
+        if(module->set_params_json && json)
+          res = module->set_params_json(module, json);
+        else if(blob)
           res = module->set_params(module, blob, length);
-          break;
-        }
+        break;
       }
     }
 
@@ -728,7 +749,7 @@ void dt_lib_init_presets(dt_lib_module_t *module)
   //   - module has legacy_params -> try to update
   //   - module doesn't have legacy_params -> delete it
 
-  if(module->set_params == NULL)
+  if(module->set_params == NULL && module->set_params_json == NULL)
   {
     sqlite3_stmt *stmt;
     // clang-format off

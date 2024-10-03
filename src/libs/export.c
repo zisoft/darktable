@@ -670,7 +670,7 @@ void gui_reset(dt_lib_module_t *self)
   dt_lib_gui_queue_update(self);
 }
 
-static void set_format_by_name(dt_lib_export_t *d,
+static void _set_format_by_name(dt_lib_export_t *d,
                                const char *name)
 {
   // Find the selected format plugin among all existing plugins
@@ -740,7 +740,7 @@ static void _format_changed(GtkWidget *widget,
 {
   const gchar *name = dt_bauhaus_combobox_get_text(d->format);
   g_signal_handlers_block_by_func(widget, _format_changed, d);
-  set_format_by_name(d, name);
+  _set_format_by_name(d, name);
   g_signal_handlers_unblock_by_func(widget, _format_changed, d);
 }
 
@@ -801,7 +801,7 @@ static void _update_dimensions(dt_lib_export_t *d)
   _validate_dimensions(d);
 }
 
-static void set_storage_by_name(dt_lib_export_t *d,
+static void _set_storage_by_name(dt_lib_export_t *d,
                                 const char *name)
 {
   int k = -1;
@@ -872,7 +872,7 @@ static void _storage_changed(GtkWidget *widget, dt_lib_module_t *self)
 
   const gchar *name = dt_bauhaus_combobox_get_text(d->storage);
   g_signal_handlers_block_by_func(widget, _storage_changed, self);
-  if(name) set_storage_by_name(d, name);
+  if(name) _set_storage_by_name(d, name);
   g_signal_handlers_unblock_by_func(widget, _storage_changed, self);
   dt_lib_gui_queue_update(self);
 }
@@ -2294,8 +2294,8 @@ int set_params(dt_lib_module_t *self,
   const void *sdata = buf;
 
   // switch modules
-  set_storage_by_name(d, sname);
-  set_format_by_name(d, fname);
+  _set_storage_by_name(d, sname);
+  _set_format_by_name(d, fname);
 
   // set dimensions after switching, to have new range ready.
   _set_dimensions(d, max_width, max_height, print_dpi, scale);
@@ -2316,6 +2316,8 @@ int set_params(dt_lib_module_t *self,
 
 int set_params_json(dt_lib_module_t *self, const gchar* json)
 {
+  dt_lib_export_t *d = (dt_lib_export_t *)self->data;
+
   JsonParser *json_parser = json_parser_new();
 
   if(json_parser_load_from_data(json_parser, json, -1, NULL) == FALSE)
@@ -2324,18 +2326,97 @@ int set_params_json(dt_lib_module_t *self, const gchar* json)
     return 1;
   }
 
+  int res = 0;
+
   // Read JSON
   JsonNode *json_root = json_parser_get_root(json_parser);
   JsonReader *json_reader = json_reader_new(json_root);
 
-  const int32_t width = dt_json_get_int(json_reader, "width");
-  const int32_t height = dt_json_get_int(json_reader, "height");
-  const gchar *size = dt_json_get_string(json_reader, "resizing_factor");
-  const gboolean high_quality_processing = dt_json_get_bool(json_reader, "high_quality_processing");
+  const int32_t iccintent = dt_json_get_int(json_reader, "iccintent");
+  const int32_t icctype = dt_json_get_int(json_reader, "icctype");
+  const int32_t max_width = dt_json_get_int(json_reader, "width");
+  const int32_t max_height = dt_json_get_int(json_reader, "height");
+  const gchar *scale = dt_json_get_string(json_reader, "resizing_factor");
+  const int32_t print_dpi = dt_json_get_int(json_reader, "print_dpi");
+  const int32_t upscale = dt_json_get_int(json_reader, "upscale");
+  const gboolean high_quality = dt_json_get_bool(json_reader, "high_quality_processing");
+  const gboolean export_masks = dt_json_get_bool(json_reader, "export_masks");
+  const int32_t dimensions_type = dt_json_get_int(json_reader, "dimensions_type");
+  const gchar *sname = dt_json_get_string(json_reader, "storage");
+  const gchar *fname = dt_json_get_string(json_reader, "format");
+  const gchar *metadata_export = dt_json_get_string(json_reader, "metadata_export");
+  const gchar *iccfilename = dt_json_get_string(json_reader, "iccprofile");
+  const gchar *style = dt_json_get_string(json_reader, "style");
+  const gboolean style_append = dt_json_get_bool(json_reader, "style_append");
 
-  printf("%d, %d, %s, %d\n", width, height, size, high_quality_processing);
+  json_reader_read_member(json_reader, "storage_params");
+  const int32_t sversion = dt_json_get_int(json_reader, "version");
+  json_reader_end_element(json_reader);
 
-  return 0;
+  json_reader_read_member(json_reader, "format_params");
+  const int32_t fversion = dt_json_get_int(json_reader, "version");
+  json_reader_end_element(json_reader);
+
+  // get module by name and fail if not there.
+  dt_imageio_module_format_t *fmod = dt_imageio_get_format_by_name(fname);
+  dt_imageio_module_storage_t *smod = dt_imageio_get_storage_by_name(sname);
+
+  if(!fmod || !smod || fversion != fmod->version() || sversion != smod->version())
+  {
+    res = 1;
+    goto end;
+  }
+
+  d->metadata_export = g_strdup(metadata_export);
+  dt_lib_export_metadata_set_conf(d->metadata_export);
+
+  // switch modules
+  _set_storage_by_name(d, sname);
+  _set_format_by_name(d, fname);
+
+  dt_bauhaus_combobox_set(d->intent, iccintent + 1);
+
+  dt_bauhaus_combobox_set(d->profile, 0);
+  if(icctype != DT_COLORSPACE_NONE)
+  {
+    for(GList *iter = darktable.color_profiles->profiles;
+        iter;
+        iter = g_list_next(iter))
+    {
+      const dt_colorspaces_color_profile_t *pp =
+        (dt_colorspaces_color_profile_t *)iter->data;
+      if(pp->out_pos > -1
+         && icctype == pp->type
+         && (icctype != DT_COLORSPACE_FILE || !strcmp(iccfilename, pp->filename)))
+      {
+        dt_bauhaus_combobox_set(d->profile, pp->out_pos + 1);
+        break;
+      }
+    }
+  }
+
+  g_free(d->style_name);
+  d->style_name = style? g_strdup(style) : g_strdup("");
+  _update_style_label(d, d->style_name);
+
+  dt_bauhaus_combobox_set(d->style_mode, style_append ? 1 : 0);
+
+  _set_dimensions(d, max_width, max_height, print_dpi, scale);
+  dt_bauhaus_combobox_set(d->upscale, upscale ? 1 : 0);
+  dt_bauhaus_combobox_set(d->high_quality, high_quality ? 1 : 0);
+  dt_bauhaus_combobox_set(d->export_masks, export_masks ? 1 : 0);
+  dt_bauhaus_combobox_set(d->dimensions_type, dimensions_type);
+  _size_update_display(d);
+
+  // propagate to modules
+  res += smod->set_params_json(smod, json_reader);
+  res += fmod->set_params_json(fmod, json_reader);
+
+  end:
+  g_object_unref(json_reader);
+  g_object_unref(json_parser);
+
+  return res;
 }
 
 gchar *get_params_json(dt_lib_module_t *self)
@@ -2346,10 +2427,7 @@ gchar *get_params_json(dt_lib_module_t *self)
   dt_imageio_module_storage_t *mstorage = dt_imageio_get_storage();
   if(!mformat || !mstorage) return NULL;
 
-  gchar *format_params = mformat->get_params_json(mformat);
-  gchar *storage_params = mstorage->get_params_json(mstorage);
-
-  JsonBuilder *json_builder = json_builder_new();
+  JsonBuilder *json_builder = json_builder_new();  
   json_builder_begin_object(json_builder);
   dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "iccintent");
   dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "icctype");
@@ -2365,14 +2443,14 @@ gchar *get_params_json(dt_lib_module_t *self)
   dt_json_add_string_from_dt_conf(json_builder, CONFIG_PREFIX "style");
   dt_json_add_bool_from_dt_conf(json_builder, CONFIG_PREFIX "style_append");
   dt_json_add_string(json_builder, "metadata_export", d->metadata_export ? d->metadata_export : "");
-  dt_json_add_string(json_builder, "format", mformat->plugin_name);
-  dt_json_add_string(json_builder, "format_params", format_params);
-  dt_json_add_string(json_builder, "storage", mstorage->plugin_name);
-  dt_json_add_string(json_builder, "storage_params", storage_params);
-  json_builder_end_object(json_builder);
 
-  g_free(format_params);
-  g_free(storage_params);
+  dt_json_add_string(json_builder, "format", mformat->plugin_name);
+  mformat->get_params_json(mformat, json_builder);
+
+  dt_json_add_string(json_builder, "storage", mstorage->plugin_name);
+  mstorage->get_params_json(mstorage, json_builder);  
+  
+  json_builder_end_object(json_builder);
 
   // generate JSON
   JsonGenerator *json_generator = json_generator_new();
