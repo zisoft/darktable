@@ -21,10 +21,9 @@
 
 static const gchar *_get_key_from_config_string(const gchar *config_string)
 {
-  const gchar *key = config_string + strlen(config_string);
-  while(--key > config_string && *key != '/')
-    ;
-  return ++key;
+  const gchar *key = strrchr(config_string, '/');
+  key = key ? key+1 : config_string;
+  return key;
 }
 
 void dt_json_add_int(JsonBuilder *json_builder, const gchar *key, const int32_t value)

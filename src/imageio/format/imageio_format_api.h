@@ -17,6 +17,7 @@
 */
 
 #include "common/module_api.h"
+#include <json-glib/json-glib.h>
 
 #ifdef FULL_API_H
 
@@ -65,7 +66,8 @@ OPTIONAL(void *, legacy_params,
 REQUIRED(size_t, params_size, struct dt_imageio_module_format_t *self);
 REQUIRED(void *, get_params, struct dt_imageio_module_format_t *self);
 /* get the params json string. return value is owned by the caller */
-REQUIRED(gchar *, get_params_json, struct dt_imageio_module_format_t *self);
+REQUIRED(void, get_params_json, struct dt_imageio_module_format_t *self, JsonBuilder *json_builder);
+REQUIRED(int, set_params_json, struct dt_imageio_module_format_t *self, JsonReader *json_reader);
 REQUIRED(void, free_params, struct dt_imageio_module_format_t *self, struct dt_imageio_module_data_t *data);
 /* resets the gui to the parameters as given here. return != 0 on fail. */
 REQUIRED(int, set_params, struct dt_imageio_module_format_t *self, const void *params, const int size);

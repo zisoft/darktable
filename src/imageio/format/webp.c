@@ -330,24 +330,31 @@ void *get_params(dt_imageio_module_format_t *self)
   return d;
 }
 
-gchar *get_params_json(dt_imageio_module_format_t *self)
+void get_params_json(dt_imageio_module_format_t *self, JsonBuilder *json_builder)
 {
-  JsonBuilder *json_builder = json_builder_new();
+  json_builder_set_member_name(json_builder, "format_params");
   json_builder_begin_object(json_builder);
+  dt_json_add_int(json_builder, "version", self->version());
   dt_json_add_int_from_dt_conf(json_builder, "plugins/imageio/format/webp/comp_type");
   dt_json_add_int_from_dt_conf(json_builder, "plugins/imageio/format/webp/quality");
   dt_json_add_int_from_dt_conf(json_builder, "lugins/imageio/format/webp/hint");
   json_builder_end_object(json_builder);
+}
 
-  // generate JSON
-  JsonGenerator *json_generator = json_generator_new();
-  json_generator_set_root(json_generator, json_builder_get_root(json_builder));
-  gchar *json_data = json_generator_to_data(json_generator, 0);
+int set_params_json(dt_imageio_module_format_t *self, JsonReader *json_reader)
+{
+  dt_imageio_webp_gui_data_t *g = (dt_imageio_webp_gui_data_t *)self->gui_data;
 
-  g_object_unref(json_generator);
-  g_object_unref(json_builder);
+  json_reader_read_member(json_reader, "format_params");
+  const uint32_t comp_type = dt_json_get_int(json_reader, "comp_type");
+  const uint32_t quality = dt_json_get_int(json_reader, "quality");
+  const uint32_t hint = dt_json_get_int(json_reader, "hint");
+  json_reader_end_element(json_reader);
 
-  return json_data;
+  dt_bauhaus_combobox_set(g->compression, comp_type);
+  dt_bauhaus_slider_set(g->quality, quality);
+  dt_bauhaus_combobox_set(g->hint, hint);
+  return 0;
 }
 
 int set_params(dt_imageio_module_format_t *self, const void *params, const int size)
