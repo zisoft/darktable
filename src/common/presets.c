@@ -64,7 +64,8 @@ void dt_presets_save_to_file(const int rowid,
      "   autoapply, model, maker, lens, iso_min, iso_max, exposure_min,"
      "   exposure_max, aperture_min, aperture_max, focal_length_min,"
      "   focal_length_max, op_version, blendop_version, enabled,"
-     "   multi_priority, multi_name, filter, def, format, multi_name_hand_edited"
+     "   multi_priority, multi_name, filter, def, format, multi_name_hand_edited,"
+     "   op_params_json"
      " FROM data.presets"
      " WHERE rowid = ?1",
      -1, &stmt, NULL);
@@ -97,6 +98,7 @@ void dt_presets_save_to_file(const int rowid,
     const int def = sqlite3_column_double(stmt, 23);
     const int format = sqlite3_column_double(stmt, 24);
     const int multi_name_hand_edited = sqlite3_column_double(stmt, 25);
+    const gchar *params_json = (gchar *)sqlite3_column_text(stmt, 26);
 
     int rc = 0;
 
@@ -127,8 +129,11 @@ void dt_presets_save_to_file(const int rowid,
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "name", "%s", name);
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "description", "%s", description);
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "operation", "%s", operation);
-    xmlTextWriterWriteFormatElement(writer, BAD_CAST "op_params", "%s",
-                                    dt_preset_encode(stmt, 0));
+    if(params_json)
+      xmlTextWriterWriteFormatElement(writer, BAD_CAST "op_params_json", "%s", params_json);
+    else
+      xmlTextWriterWriteFormatElement(writer, BAD_CAST "op_params", "%s",
+                                      dt_preset_encode(stmt, 0));
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "op_version", "%d", op_version);
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "enabled", "%d", enabled);
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "autoapply", "%d", autoapply);
@@ -243,6 +248,7 @@ gboolean dt_presets_import_from_file(const char *preset_path)
   const int focal_length_min = get_preset_element_int(doc, "focal_length_min");
   const int focal_length_max = get_preset_element_int(doc, "focal_length_max");
   gchar *op_params = get_preset_element(doc, "op_params");
+  gchar *op_params_json = get_preset_element(doc, "op_params_json");
   const int op_version = get_preset_element_int(doc, "op_version");
   gchar *blendop_params = get_preset_element(doc, "blendop_params");
   const int blendop_version = get_preset_element_int(doc, "blendop_version");
@@ -260,8 +266,9 @@ gboolean dt_presets_import_from_file(const char *preset_path)
     (blendop_params, strlen(blendop_params), &blendop_params_len);
 
   int op_params_len = 0;
-  const unsigned char *op_params_blob = dt_exif_xmp_decode
-    (op_params, strlen(op_params), &op_params_len);
+  const unsigned char *op_params_blob = NULL;
+  if(!op_params_json)
+    op_params_blob = dt_exif_xmp_decode(op_params, strlen(op_params), &op_params_len);
 
   sqlite3_stmt *stmt;
   int result = 0;
@@ -275,9 +282,9 @@ gboolean dt_presets_import_from_file(const char *preset_path)
      "     aperture_min, aperture_max, focal_length_min, focal_length_max,"
      "     op_params, op_version, blendop_params, blendop_version, enabled,"
      "     multi_priority, multi_name, filter, def, format, multi_name_hand_edited,"
-     "     writeprotect)"
+     "     writeprotect, op_params_json)"
      "  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, "
-     "          ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, 0)",
+     "          ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, 0, ?27)",
      -1, &stmt, NULL);
   // clang-format on
 
@@ -308,6 +315,7 @@ gboolean dt_presets_import_from_file(const char *preset_path)
   DT_DEBUG_SQLITE3_BIND_INT(stmt, 24, def);
   DT_DEBUG_SQLITE3_BIND_INT(stmt, 25, format);
   DT_DEBUG_SQLITE3_BIND_INT(stmt, 26, multi_name_hand_edited);
+  DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 27, op_params_json, strlen(op_params_json), SQLITE_TRANSIENT);
 
   result = (sqlite3_step(stmt) == SQLITE_DONE);
 
