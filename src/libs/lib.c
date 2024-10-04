@@ -853,14 +853,24 @@ void dt_lib_init_presets(dt_lib_module_t *module)
           // clang-format off
           DT_DEBUG_SQLITE3_PREPARE_V2(dt_database_get(darktable.db),
                                       "UPDATE data.presets"
-                                      " SET op_version=?1, op_params=?2"
-                                      " WHERE rowid=?3", -1,
+                                      " SET op_version=?1, op_params=?2, op_params_json=?3"
+                                      " WHERE rowid=?4", -1,
                                       &innerstmt, NULL);
           // clang-format on
           DT_DEBUG_SQLITE3_BIND_INT(innerstmt, 1, version);
-          DT_DEBUG_SQLITE3_BIND_BLOB(innerstmt, 2, new_params, new_params_size,
-                                     SQLITE_TRANSIENT);
-          DT_DEBUG_SQLITE3_BIND_INT(innerstmt, 3, rowid);
+          if(new_params_size == -1)
+          {
+            // we have a JSON now instead of a blob
+            DT_DEBUG_SQLITE3_BIND_BLOB(innerstmt, 2, NULL, 0, SQLITE_TRANSIENT);
+            DT_DEBUG_SQLITE3_BIND_TEXT(innerstmt, 3, (char *)new_params, -1, SQLITE_TRANSIENT);
+          }
+          else
+          {
+            DT_DEBUG_SQLITE3_BIND_BLOB(innerstmt, 2, new_params, new_params_size, SQLITE_TRANSIENT);
+            DT_DEBUG_SQLITE3_BIND_TEXT(innerstmt, 3, NULL, -1, SQLITE_TRANSIENT);
+          }
+          
+          DT_DEBUG_SQLITE3_BIND_INT(innerstmt, 4, rowid);
           sqlite3_step(innerstmt);
           sqlite3_finalize(innerstmt);
         }

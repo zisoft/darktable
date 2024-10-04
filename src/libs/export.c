@@ -45,7 +45,7 @@
 
 #include <glib.h>
 
-DT_MODULE(8)
+DT_MODULE(9)
 
 #define EXPORT_MAX_IMAGE_SIZE UINT16_MAX
 #define CONFIG_PREFIX "plugins/lighttable/export/"
@@ -2049,6 +2049,109 @@ void *legacy_params(dt_lib_module_t *self,
     *new_version = 8;
     return new_params;
   }
+  else if(old_version == 8)
+  {
+    // v9: convert to JSON
+    
+    // format of v8:
+    //  - 9 x int32_t (max_width, max_height, upscale, high_quality,
+    //                 export_masks, iccintent, icctype, dimensions_type, print_dpi)
+    //  - old rest
+
+    JsonBuilder *json_builder = json_builder_new();
+    json_builder_begin_object(json_builder);
+    dt_json_add_int(json_builder, "version", self->version());
+
+    const void *buf = old_params;
+
+    dt_json_add_int(json_builder, "width", *(uint32_t *)buf);
+    buf += sizeof(uint32_t);
+    dt_json_add_int(json_builder, "height", *(uint32_t *)buf);
+    buf += sizeof(uint32_t);
+    dt_json_add_int(json_builder, "upscale", *(uint32_t *)buf);
+    buf += sizeof(uint32_t);
+    dt_json_add_bool(json_builder, "high_quality_processing", *(uint32_t *)buf > 0);
+    buf += sizeof(uint32_t);
+    dt_json_add_bool(json_builder, "export_masks", *(uint32_t *)buf > 0);
+    buf += sizeof(uint32_t);
+    dt_json_add_int(json_builder, "iccintent", *(uint32_t *)buf);
+    buf += sizeof(uint32_t);
+    dt_json_add_int(json_builder, "icctype", *(uint32_t *)buf);
+    buf += sizeof(uint32_t);
+    dt_json_add_int(json_builder, "dimensions_type", *(uint32_t *)buf);
+    buf += sizeof(uint32_t);
+    dt_json_add_int(json_builder, "print_dpi", *(uint32_t *)buf);
+    buf += sizeof(uint32_t);
+    dt_json_add_string(json_builder, "resizing_factor", (char *)buf);
+    buf += strlen(buf) + 1;
+    dt_json_add_string(json_builder, "metadata_export", (char *)buf);
+    buf += strlen(buf) + 1;
+    dt_json_add_string(json_builder, "iccprofile", (char *)buf);
+    buf += strlen(buf) + 1;
+    dt_json_add_string(json_builder, "format", (char *)buf);
+    buf += strlen(buf) + 1;
+    dt_json_add_string(json_builder, "storage", (char *)buf);
+    buf += strlen(buf) + 1;
+
+    const uint32_t fversion = *(uint32_t *)buf;
+    buf += sizeof(uint32_t);
+    const uint32_t sversion = *(uint32_t *)buf;
+    buf += sizeof(uint32_t);
+    const uint32_t fsize = *(uint32_t *)buf;
+    buf += sizeof(int32_t);
+    const uint32_t ssize = *(uint32_t *)buf;
+    buf += sizeof(int32_t);
+
+    // fdata
+    const void *fdata = buf;
+    fdata += 4 * sizeof(uint32_t); // max_width, max_height, width, height
+    char *style = (char *)fdata;
+    fdata += sizeof(((dt_imageio_module_data_t){}).style);
+    const uint32_t style_append = *(uint32_t *)fdata;
+    fdata += sizeof(uint32_t);
+    const uint32_t fquality = *(uint32_t *)fdata;
+    fdata += sizeof(int32_t);
+    const uint32_t fsubsample = *(uint32_t *)fdata;
+    buf += fsize;
+
+    // sdata
+    const void *sdata = buf;
+    const char *file_directory = sdata;
+    sdata += strlen(file_directory) + 1;
+    const uint32_t overwrite = *(uint32_t *)sdata;
+    buf += ssize;
+
+    dt_json_add_string(json_builder, "style", style);
+    dt_json_add_bool(json_builder, "style_append", style_append > 0);
+
+    json_builder_set_member_name(json_builder, "format_params");
+    json_builder_begin_object(json_builder);
+    dt_json_add_int(json_builder, "version", fversion);
+    dt_json_add_int(json_builder, "quality", fquality);
+    dt_json_add_int(json_builder, "subsample", fsubsample);
+    json_builder_end_object(json_builder);
+
+    json_builder_set_member_name(json_builder, "storage_params");
+    json_builder_begin_object(json_builder);
+    dt_json_add_int(json_builder, "version", sversion);
+    dt_json_add_string(json_builder, "file_directory", file_directory);
+    dt_json_add_int(json_builder, "overwrite", overwrite);
+    json_builder_end_object(json_builder);
+
+    json_builder_end_object(json_builder);
+
+    // generate JSON
+    JsonGenerator *json_generator = json_generator_new();
+    json_generator_set_root(json_generator, json_builder_get_root(json_builder));
+    gchar *json_data = json_generator_to_data(json_generator, 0);
+
+    g_object_unref(json_generator);
+    g_object_unref(json_builder);
+
+    *new_size = -1;   // this is the indicator that we have json now instead of a blob
+    *new_version = 9;
+    return json_data;
+  }
 
   return NULL;
 }
@@ -2427,25 +2530,24 @@ gchar *get_params_json(dt_lib_module_t *self)
   JsonBuilder *json_builder = json_builder_new();  
   json_builder_begin_object(json_builder);
   dt_json_add_int(json_builder, "version", self->version());
-  dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "iccintent");
-  dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "icctype");
   dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "width");
   dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "height");
   dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "upscale");
+  dt_json_add_bool_from_dt_conf(json_builder, CONFIG_PREFIX "high_quality_processing");
+  dt_json_add_bool_from_dt_conf(json_builder, CONFIG_PREFIX "export_masks");
+  dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "iccintent");
+  dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "icctype");
   dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "dimensions_type");
   dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "print_dpi");
   dt_json_add_string_from_dt_conf(json_builder, CONFIG_PREFIX "resizing_factor");
-  dt_json_add_bool_from_dt_conf(json_builder, CONFIG_PREFIX "high_quality_processing");
-  dt_json_add_bool_from_dt_conf(json_builder, CONFIG_PREFIX "export_masks");
+  dt_json_add_string(json_builder, "metadata_export", d->metadata_export ? d->metadata_export : "");
   dt_json_add_string_from_dt_conf(json_builder, CONFIG_PREFIX "iccprofile");
+  dt_json_add_string(json_builder, "format", mformat->plugin_name);
+  dt_json_add_string(json_builder, "storage", mstorage->plugin_name);
   dt_json_add_string_from_dt_conf(json_builder, CONFIG_PREFIX "style");
   dt_json_add_bool_from_dt_conf(json_builder, CONFIG_PREFIX "style_append");
-  dt_json_add_string(json_builder, "metadata_export", d->metadata_export ? d->metadata_export : "");
 
-  dt_json_add_string(json_builder, "format", mformat->plugin_name);
   mformat->get_params_json(mformat, json_builder);
-
-  dt_json_add_string(json_builder, "storage", mstorage->plugin_name);
   mstorage->get_params_json(mstorage, json_builder);  
   
   json_builder_end_object(json_builder);
