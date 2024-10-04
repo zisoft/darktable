@@ -79,7 +79,7 @@ gchar *dt_lib_get_active_preset_name(dt_lib_module_info_t *minfo)
   // clang-format off
   DT_DEBUG_SQLITE3_PREPARE_V2(
       dt_database_get(darktable.db),
-      "SELECT name, op_params, writeprotect"
+      "SELECT name, op_params, op_params_json"
       " FROM data.presets"
       " WHERE operation=?1 AND op_version=?2",
       -1, &stmt, NULL);
@@ -92,8 +92,22 @@ gchar *dt_lib_get_active_preset_name(dt_lib_module_info_t *minfo)
   {
     void *op_params = (void *)sqlite3_column_blob(stmt, 1);
     int32_t op_params_size = sqlite3_column_bytes(stmt, 1);
-    if(op_params_size == minfo->params_size
-       && !memcmp(minfo->params, op_params, op_params_size))
+    const char *params_json = (char *)sqlite3_column_text(stmt, 2);
+
+    gchar *mparams_json = NULL;
+    if(minfo->module->get_params_json != NULL)
+      mparams_json = minfo->module->get_params_json(minfo->module);
+
+    gboolean params_match = FALSE;
+    if(mparams_json && params_json)
+      params_match = !strcmp(mparams_json, params_json);
+    else
+      params_match = op_params_size == minfo->params_size
+                     && !memcmp(minfo->params, op_params, op_params_size);
+
+    g_free(mparams_json);
+
+    if(params_match)
     {
       name = g_strdup((char *)sqlite3_column_text(stmt, 0));
       break;
