@@ -173,9 +173,16 @@ static void menuitem_update_preset(GtkMenuItem *menuitem,
     DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 1, minfo->plugin_name, -1,
                                SQLITE_TRANSIENT);
     DT_DEBUG_SQLITE3_BIND_INT(stmt, 2, minfo->version);
-    DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 3, minfo->params, minfo->params_size,
-                               SQLITE_TRANSIENT);
-    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 4, params_json, -1, SQLITE_TRANSIENT);
+    if(params_json == NULL)
+    {
+      DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 3, minfo->params, minfo->params_size, SQLITE_TRANSIENT);
+      DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 4, NULL, -1, SQLITE_TRANSIENT);
+    }
+    else
+    {
+      DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 3, NULL, 0, SQLITE_TRANSIENT);
+      DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 4, params_json, -1, SQLITE_TRANSIENT);
+    }    
     DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 5, name, -1, SQLITE_TRANSIENT);
     sqlite3_step(stmt);
     sqlite3_finalize(stmt);
@@ -189,6 +196,12 @@ static void menuitem_new_preset(GtkMenuItem *menuitem,
 {
   dt_lib_presets_remove(_("new preset"), minfo->plugin_name, minfo->version);
 
+  gchar *params_json = NULL;
+  if(minfo->module->get_params_json)
+  {
+    params_json = minfo->module->get_params_json(minfo->module);
+  }
+
   // add new preset
   sqlite3_stmt *stmt;
   // clang-format off
@@ -198,19 +211,30 @@ static void menuitem_new_preset(GtkMenuItem *menuitem,
       "  blendop_params, blendop_version, enabled, model, maker, lens,"
       "  iso_min, iso_max, exposure_min, exposure_max, aperture_min, aperture_max,"
       "  focal_length_min, focal_length_max, writeprotect, "
-      "  autoapply, filter, def, format)"
+      "  autoapply, filter, def, format, op_params_json, blendop_params_json)"
       " VALUES (?1, '', ?2, ?3, ?4, NULL, 0, 1, '%', "
       "         '%', '%', 0, 340282346638528859812000000000000000000, 0, 100000000,"
-      "          0, 100000000, 0, 1000, 0, 0, 0, 0, 0)",
+      "          0, 100000000, 0, 1000, 0, 0, 0, 0, 0, ?5, NULL)",
       -1, &stmt, NULL);
   // clang-format on
   DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 1, _("new preset"), -1, SQLITE_STATIC);
   DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 2, minfo->plugin_name, -1, SQLITE_TRANSIENT);
   DT_DEBUG_SQLITE3_BIND_INT(stmt, 3, minfo->version);
-  DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 4, minfo->params, minfo->params_size, SQLITE_TRANSIENT);
+  if(params_json == NULL)
+  {
+    DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 4, minfo->params, minfo->params_size, SQLITE_TRANSIENT);
+    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 5, NULL, -1, SQLITE_TRANSIENT);
+  }
+  else
+  {
+    DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 4, NULL, 0, SQLITE_TRANSIENT);
+    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 5, params_json, -1, SQLITE_TRANSIENT);
+  }
   sqlite3_step(stmt);
   sqlite3_finalize(stmt);
   // create a shortcut for the new entry
+
+  g_free(params_json);
 
   dt_action_define_preset(&minfo->module->actions, _("new preset"));
 
@@ -470,7 +494,7 @@ static void dt_lib_presets_popup_menu_show(dt_lib_module_info_t *minfo,
   sqlite3_stmt *stmt;
   // order like the pref value
   // clang-format off
-  gchar *query = g_strdup_printf("SELECT name, op_params, writeprotect, description"
+  gchar *query = g_strdup_printf("SELECT name, op_params, writeprotect, description, op_params_json"
                                  " FROM data.presets"
                                  " WHERE operation=?1 AND op_version=?2"
                                  " ORDER BY writeprotect %s, LOWER(name), rowid",
@@ -503,9 +527,10 @@ static void dt_lib_presets_popup_menu_show(dt_lib_module_info_t *minfo,
       gtk_menu_shell_append(GTK_MENU_SHELL(menu), gtk_separator_menu_item_new());
     }
 
+    const char *name = (char *)sqlite3_column_text(stmt, 0);
     void *op_params = (void *)sqlite3_column_blob(stmt, 1);
     int32_t op_params_size = sqlite3_column_bytes(stmt, 1);
-    const char *name = (char *)sqlite3_column_text(stmt, 0);
+    const char *params_json = (char *)sqlite3_column_text(stmt, 4);
 
     if(darktable.gui->last_preset
        && strcmp(darktable.gui->last_preset, name) == 0) found = 1;
@@ -518,8 +543,19 @@ static void dt_lib_presets_popup_menu_show(dt_lib_module_info_t *minfo,
     // ((const char*)(minfo->params))[k],
     // ((const char*)(op_params))[k],
     // k, memcmp(minfo->params, op_params, k));
-    if(op_params_size == minfo->params_size
-       && !memcmp(minfo->params, op_params, op_params_size))
+
+    gchar *mparams_json = NULL;
+    if(minfo->module->get_params_json != NULL)
+      mparams_json = minfo->module->get_params_json(minfo->module);
+
+    gboolean params_match = FALSE;
+    if(mparams_json && params_json)
+      params_match = !strcmp(mparams_json, params_json);
+    else
+      params_match = op_params_size == minfo->params_size
+                     && !memcmp(minfo->params, op_params, op_params_size);
+
+    if(params_match)
     {
       active_preset = cnt;
       selected_writeprotect = writeprotect;
@@ -543,6 +579,8 @@ static void dt_lib_presets_popup_menu_show(dt_lib_module_info_t *minfo,
     gtk_widget_set_has_tooltip(mi, TRUE);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
     cnt++;
+
+    g_free(mparams_json);
   }
   sqlite3_finalize(stmt);
 

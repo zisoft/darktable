@@ -1630,7 +1630,7 @@ void init_presets(dt_lib_module_t *self)
       sqlite3_step(innerstmt);
       sqlite3_finalize(innerstmt);
     }
-    else
+    else if(self->get_params_json == NULL)
     {
       // extract the interesting parts from the blob
       const char *buf = (const char *)op_params;
@@ -2395,10 +2395,7 @@ int set_params_json(dt_lib_module_t *self, const gchar* json)
     }
   }
 
-  g_free(d->style_name);
-  d->style_name = style? g_strdup(style) : g_strdup("");
-  _update_style_label(d, d->style_name);
-
+  _update_style_label(d, style);
   dt_bauhaus_combobox_set(d->style_mode, style_append ? 1 : 0);
 
   _set_dimensions(d, max_width, max_height, print_dpi, scale);
@@ -2429,6 +2426,7 @@ gchar *get_params_json(dt_lib_module_t *self)
 
   JsonBuilder *json_builder = json_builder_new();  
   json_builder_begin_object(json_builder);
+  dt_json_add_int(json_builder, "version", self->version());
   dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "iccintent");
   dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "icctype");
   dt_json_add_int_from_dt_conf(json_builder, CONFIG_PREFIX "width");
