@@ -294,10 +294,10 @@ static void _edit_preset_response(GtkDialog *dialog,
          "  aperture_max, focal_length_min, focal_length_max, autoapply,"
          "  filter, format, def, writeprotect, operation, op_version, op_params, enabled,"
          "  blendop_params, blendop_version,"
-         "  multi_priority, multi_name, multi_name_hand_edited) "
+         "  multi_priority, multi_name, multi_name_hand_edited, op_params_json) "
          "VALUES"
          " (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16,"
-         "   0, 0, ?17, ?18, ?19, ?20, ?21, ?22, 0, ?23, ?24)");
+         "   0, 0, ?17, ?18, ?19, ?20, ?21, ?22, 0, ?23, ?24, ?25)");
       // clang-format on
     }
 
@@ -378,13 +378,31 @@ static void _edit_preset_response(GtkDialog *dialog,
         // for auto init presets we don't record the params. When applying such preset
         // the default params will be used and this will trigger the computation of
         // the actual parameters.
-        DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 19,
-                                   is_auto_init ? NULL : g->iop->params,
-                                   is_auto_init ?    0 : g->iop->params_size,
-                                   SQLITE_TRANSIENT);
+
+        gchar *params_json = NULL;
+        if(g->iop->get_params_json)
+        {
+          params_json = g->iop->get_params_json(g->iop);
+          DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 19, NULL, 0, SQLITE_TRANSIENT);
+          DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 25,
+                                      is_auto_init ? NULL : params_json,
+                                      -1,
+                                      SQLITE_TRANSIENT);
+        }
+        else
+        {
+          DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 19,
+                                    is_auto_init ? NULL : g->iop->params,
+                                    is_auto_init ?    0 : g->iop->params_size,
+                                    SQLITE_TRANSIENT);
+          DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 25, NULL, -1, SQLITE_TRANSIENT);
+        }
+
         DT_DEBUG_SQLITE3_BIND_INT(stmt, 20, g->iop->enabled);
         DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 23, g->iop->multi_name, -1, SQLITE_TRANSIENT);
         DT_DEBUG_SQLITE3_BIND_INT(stmt, 24, g->iop->multi_name_hand_edited);
+
+        g_free(params_json);
       }
     }
 
@@ -1048,7 +1066,7 @@ void dt_gui_presets_apply_preset(const gchar* name,
   DT_DEBUG_SQLITE3_PREPARE_V2(
      dt_database_get(darktable.db),
      "SELECT op_params, enabled, blendop_params, blendop_version, writeprotect,"
-     "       multi_name, multi_name_hand_edited"
+     "       multi_name, multi_name_hand_edited, op_params_json"
      " FROM data.presets"
      " WHERE operation = ?1 AND op_version = ?2 AND name = ?3",
      -1, &stmt, NULL);
@@ -1068,8 +1086,11 @@ void dt_gui_presets_apply_preset(const gchar* name,
     const int writeprotect = sqlite3_column_int(stmt, 4);
     const char *multi_name = (const char *)sqlite3_column_text(stmt, 5);
     const int multi_name_hand_edited = sqlite3_column_int(stmt, 6);
+    const char *params_json = (const char *)sqlite3_column_text(stmt, 7);
 
-    if(op_params && (op_length == module->params_size))
+    if(module->set_params_json && params_json)
+      module->set_params_json(module, params_json);
+    else if(op_params && (op_length == module->params_size))
       memcpy(module->params, op_params, op_length);
     else
       memcpy(module->params, module->default_params, module->params_size);
