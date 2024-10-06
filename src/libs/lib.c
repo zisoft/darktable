@@ -327,12 +327,12 @@ gchar *dt_lib_presets_duplicate(const gchar *preset,
       "  blendop_params, blendop_version, enabled, model, maker, lens, "
       "  iso_min, iso_max, exposure_min, exposure_max, aperture_min, aperture_max, "
       "  focal_length_min, focal_length_max, writeprotect, "
-      "  autoapply, filter, def, format) "
+      "  autoapply, filter, def, format, op_params_json, blendop_params_json) "
       "SELECT ?1, description, operation, op_version, op_params, "
       "  blendop_params, blendop_version, enabled, model, maker, lens, "
       "  iso_min, iso_max, exposure_min, exposure_max, aperture_min, aperture_max, "
       "  focal_length_min, focal_length_max, 0, "
-      "  autoapply, filter, def, format"
+      "  autoapply, filter, def, format, op_params_json, blendop_params_json"
       " FROM data.presets"
       " WHERE operation = ?2 AND op_version = ?3 AND name = ?4",
       -1, &stmt, NULL);

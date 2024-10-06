@@ -29,6 +29,7 @@
 #include "bauhaus/bauhaus.h"
 #include "common/histogram.h"
 #include "common/image_cache.h"
+#include "common/json.h"
 #include "common/mipmap_cache.h"
 #include "common/opencl.h"
 #include "control/control.h"
@@ -48,7 +49,7 @@
 #define exposure2white(x) exp2f(-(x))
 #define white2exposure(x) -dt_log2f(fmaxf(1e-20f, x))
 
-DT_MODULE_INTROSPECTION(6, dt_iop_exposure_params_t)
+DT_MODULE_INTROSPECTION(7, dt_iop_exposure_params_t)
 
 typedef enum dt_iop_exposure_mode_t
 {
@@ -284,6 +285,35 @@ int legacy_params(dt_iop_module_t *self,
     *new_params = n;
     *new_params_size = sizeof(dt_iop_exposure_params_v6_t);
     *new_version = 6;
+    return 0;
+  }
+  if(old_version == 6)
+  {
+    // convert to json
+    const dt_iop_exposure_params_v6_t *o = (dt_iop_exposure_params_v6_t *)old_params;
+
+    JsonBuilder *json_builder = json_builder_new();  
+    json_builder_begin_object(json_builder);
+    dt_json_add_int(json_builder, "version", self->version());
+    dt_json_add_int(json_builder, "mode", o->mode);
+    dt_json_add_float(json_builder, "black", o->black);
+    dt_json_add_float(json_builder, "exposure", o->exposure);
+    dt_json_add_float(json_builder, "deflicker_percentile", o->deflicker_percentile);
+    dt_json_add_float(json_builder, "deflicker_target_level", o->deflicker_target_level);
+    dt_json_add_bool(json_builder, "compensate_expore_bias", o->compensate_exposure_bias);
+    json_builder_end_object(json_builder);
+
+    // generate JSON
+    JsonGenerator *json_generator = json_generator_new();
+    json_generator_set_root(json_generator, json_builder_get_root(json_builder));
+    gchar *json_data = json_generator_to_data(json_generator, 0);
+
+    g_object_unref(json_generator);
+    g_object_unref(json_builder);
+
+    *new_params = json_data;
+    *new_params_size = -1;  // this indicates that we have json now
+    *new_version = 7;
     return 0;
   }
   return 1;
@@ -1280,6 +1310,56 @@ void gui_cleanup(struct dt_iop_module_t *self)
   g_idle_remove_by_data(self);
 
   IOP_GUI_FREE;
+}
+
+gchar *get_params_json(dt_iop_module_t *self)
+{
+  dt_iop_exposure_params_t *p = (dt_iop_exposure_params_t *)self->params;
+
+  JsonBuilder *json_builder = json_builder_new();  
+  json_builder_begin_object(json_builder);
+  dt_json_add_int(json_builder, "version", self->version());
+  dt_json_add_int(json_builder, "mode", p->mode);
+  dt_json_add_float(json_builder, "black", p->black);
+  dt_json_add_float(json_builder, "exposure", p->exposure);
+  dt_json_add_float(json_builder, "deflicker_percentile", p->deflicker_percentile);
+  dt_json_add_float(json_builder, "deflicker_target_level", p->deflicker_target_level);
+  dt_json_add_bool(json_builder, "compensate_expore_bias", p->compensate_exposure_bias);
+  json_builder_end_object(json_builder);
+
+  // generate JSON
+  JsonGenerator *json_generator = json_generator_new();
+  json_generator_set_root(json_generator, json_builder_get_root(json_builder));
+  gchar *json_data = json_generator_to_data(json_generator, 0);
+
+  g_object_unref(json_generator);
+  g_object_unref(json_builder);
+
+  return json_data;
+}
+
+int set_params_json(dt_iop_module_t *self, const gchar *json)
+{
+  dt_iop_exposure_params_t *p = (dt_iop_exposure_params_t *)self->params;
+
+  JsonParser *json_parser = json_parser_new();
+
+  if(json_parser_load_from_data(json_parser, json, -1, NULL) == FALSE)
+  {              
+    g_object_unref(json_parser);
+    return 1;
+  }
+
+  // Read JSON
+  JsonNode *json_root = json_parser_get_root(json_parser);
+  JsonReader *json_reader = json_reader_new(json_root);
+  p->mode = dt_json_get_int(json_reader, "mode");
+  p->black = dt_json_get_float(json_reader, "black");
+  p->exposure = dt_json_get_float(json_reader, "exposure");
+  p->deflicker_percentile = dt_json_get_float(json_reader, "deflicker_percentile");
+  p->deflicker_target_level = dt_json_get_float(json_reader, "deflicker_target_level");
+  p->compensate_exposure_bias = dt_json_get_float(json_reader, "compensate_exposure_bias");
+  return 0;
 }
 
 // clang-format off

@@ -1386,8 +1386,17 @@ int dt_iop_legacy_params(dt_iop_module_t *module,
 
     if(params)
     {
-      memcpy(*new_params, params, params_size);
-      free(params);
+      if(params_size > 0)
+      {
+        memcpy(*new_params, params, params_size);
+        free(params);
+      }
+      else
+      {
+        // JSON
+        *new_params = params;
+      }
+      
     }
   }
   else
@@ -1497,6 +1506,7 @@ static void _init_presets(dt_iop_module_so_t *module_so)
       void *new_params = calloc(1, new_params_size);
 
       gboolean auto_init = FALSE;
+      gboolean is_json = module->get_params_json != NULL;
 
       if(old_params_size > 0)
       {
@@ -1515,6 +1525,8 @@ static void _init_presets(dt_iop_module_so_t *module_so)
         }
         else if(legacy_ret == -1)
           auto_init = TRUE;
+        else if(legacy_ret == -2)
+          is_json = TRUE;
       }
       else
         auto_init = TRUE;
@@ -1530,18 +1542,27 @@ static void _init_presets(dt_iop_module_so_t *module_so)
       // clang-format off
       DT_DEBUG_SQLITE3_PREPARE_V2(dt_database_get(darktable.db),
                                   "UPDATE data.presets"
-                                  " SET op_version=?1, op_params=?2"
-                                  " WHERE operation=?3 AND name=?4",
+                                  " SET op_version=?1, op_params=?2, op_params_json=?3"
+                                  " WHERE operation=?4 AND name=?5",
                                   -1, &stmt2, NULL);
       // clang-format on
       DT_DEBUG_SQLITE3_BIND_INT(stmt2, 1, module->version());
       // legacy_ret == -1 means that this is to convert to an auto-init module
-      DT_DEBUG_SQLITE3_BIND_BLOB(stmt2, 2,
-                                 auto_init ? NULL : new_params,
-                                 auto_init ?    0 : new_params_size,
-                                 SQLITE_TRANSIENT);
-      DT_DEBUG_SQLITE3_BIND_TEXT(stmt2, 3, module->op, -1, SQLITE_TRANSIENT);
-      DT_DEBUG_SQLITE3_BIND_TEXT(stmt2, 4, name, -1, SQLITE_TRANSIENT);
+      if(is_json)
+      {
+        DT_DEBUG_SQLITE3_BIND_BLOB(stmt2, 2, NULL, 0, SQLITE_TRANSIENT);
+        DT_DEBUG_SQLITE3_BIND_TEXT(stmt2, 3, (char *)new_params, -1, SQLITE_TRANSIENT);
+      }
+      else
+      {
+        DT_DEBUG_SQLITE3_BIND_BLOB(stmt2, 2,
+                                  auto_init ? NULL : new_params,
+                                  auto_init ?    0 : new_params_size,
+                                  SQLITE_TRANSIENT);
+        DT_DEBUG_SQLITE3_BIND_TEXT(stmt2, 3, NULL, -1, SQLITE_TRANSIENT);
+      }
+      DT_DEBUG_SQLITE3_BIND_TEXT(stmt2, 4, module->op, -1, SQLITE_TRANSIENT);
+      DT_DEBUG_SQLITE3_BIND_TEXT(stmt2, 5, name, -1, SQLITE_TRANSIENT);
 
       sqlite3_step(stmt2);
       sqlite3_finalize(stmt2);
