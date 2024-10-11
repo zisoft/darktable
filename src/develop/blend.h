@@ -28,7 +28,7 @@
 #include "common/imagebuf.h"
 #include "common/gaussian.h"
 
-#define DEVELOP_BLEND_VERSION (13)
+#define DEVELOP_BLEND_VERSION (14)
 
 G_BEGIN_DECLS
 
@@ -518,6 +518,10 @@ void dt_iop_gui_blending_reload_defaults(dt_iop_module_t *module);
 gboolean blend_color_picker_apply(dt_iop_module_t *module,
                                   GtkWidget *picker,
                                   dt_dev_pixelpipe_t *pipe);
+
+/** from/to json */
+gchar *get_blend_params_json(dt_develop_blend_params_t *params);
+int set_blend_params_json(dt_develop_blend_params_t *params, const gchar *json);
 
 #ifdef HAVE_OPENCL
 /** apply blend for opencl modules*/

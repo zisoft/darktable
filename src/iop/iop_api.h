@@ -326,8 +326,8 @@ DEFAULT(dt_introspection_field_t *, get_f, const char *name);
 // optional preference entry to add at the bottom of the preset menu
 OPTIONAL(void, set_preferences, void *menu, struct dt_iop_module_t *self);
 
-OPTIONAL(gchar *, get_params_json, struct dt_iop_module_t *self);
-OPTIONAL(int, set_params_json, struct dt_iop_module_t *self, const gchar *json);
+OPTIONAL(gchar *, get_params_json, dt_iop_params_t *params);
+OPTIONAL(int, set_params_json, dt_iop_params_t *params, const gchar *json);
 
 #ifdef FULL_API_H
 

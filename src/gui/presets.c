@@ -116,16 +116,18 @@ void dt_gui_presets_add_with_blendop(const char *name,
 {
   sqlite3_stmt *stmt;
 
+  gchar *blendop_params_json = get_blend_params_json((dt_develop_blend_params_t *)blend_params);
+
   // clang-format off
   DT_DEBUG_SQLITE3_PREPARE_V2(
       dt_database_get(darktable.db),
       "INSERT OR REPLACE"
-      " INTO data.presets (name, description, operation, op_version, op_params, enabled,"
-      "                    blendop_params, blendop_version, multi_priority, multi_name,"
+      " INTO data.presets (name, description, operation, op_version, op_params, op_params_json, enabled,"
+      "                    blendop_params, blendop_params_json, blendop_version, multi_priority, multi_name,"
       "                    model, maker, lens, iso_min, iso_max, exposure_min, exposure_max,"
       "                    aperture_min, aperture_max, focal_length_min, focal_length_max,"
       "                    writeprotect, autoapply, filter, def, format)"
-      " VALUES (?1, '', ?2, ?3, ?4, ?5, ?6, ?7, 0, '', '%', '%', '%', 0,"
+      " VALUES (?1, '', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, '', '%', '%', '%', 0,"
       "         340282346638528859812000000000000000000, 0, 10000000, 0, 100000000, 0,"
       "         1000, 1, 0, 0, 0, 0)",
       -1, &stmt, NULL);
@@ -133,13 +135,25 @@ void dt_gui_presets_add_with_blendop(const char *name,
   DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 1, name, -1, SQLITE_TRANSIENT);
   DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 2, op, -1, SQLITE_TRANSIENT);
   DT_DEBUG_SQLITE3_BIND_INT(stmt, 3, version);
-  DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 4, params, params_size, SQLITE_TRANSIENT);
-  DT_DEBUG_SQLITE3_BIND_INT(stmt, 5, enabled);
-  DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 6, blend_params, sizeof(dt_develop_blend_params_t),
-                             SQLITE_TRANSIENT);
-  DT_DEBUG_SQLITE3_BIND_INT(stmt, 7, dt_develop_blend_version());
+  if(params_size < 0)
+  {
+    // json
+    DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 4, NULL, 0, SQLITE_TRANSIENT);
+    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 5, (char *)params, -1, SQLITE_TRANSIENT);
+  }
+  else
+  {
+    DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 4, params, params_size, SQLITE_TRANSIENT);
+    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 5, NULL, -1, SQLITE_TRANSIENT);
+  }
+  DT_DEBUG_SQLITE3_BIND_INT(stmt, 6, enabled);
+  DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 7, NULL, 0, SQLITE_TRANSIENT);
+  DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 8, blendop_params_json, -1, SQLITE_TRANSIENT);
+  DT_DEBUG_SQLITE3_BIND_INT(stmt, 9, dt_develop_blend_version());
   sqlite3_step(stmt);
   sqlite3_finalize(stmt);
+
+  g_free(blendop_params_json);
 }
 
 static void _menuitem_delete_preset(GtkMenuItem *menuitem,
@@ -278,7 +292,8 @@ static void _edit_preset_response(GtkDialog *dialog,
          "  filter=?15, format=?16 %s"
          " WHERE rowid=%d",
          g->iop
-           ? ", op_params=?19, enabled=?20, multi_name=?23, multi_name_hand_edited=?24"
+           ? ", op_params=?19, enabled=?20, multi_name=?23, multi_name_hand_edited=?24,"
+             "  op_params_json=?25, blendop_params_json=?26"
            : "",
          g->old_id);
       // clang-format on
@@ -294,10 +309,11 @@ static void _edit_preset_response(GtkDialog *dialog,
          "  aperture_max, focal_length_min, focal_length_max, autoapply,"
          "  filter, format, def, writeprotect, operation, op_version, op_params, enabled,"
          "  blendop_params, blendop_version,"
-         "  multi_priority, multi_name, multi_name_hand_edited, op_params_json) "
+         "  multi_priority, multi_name, multi_name_hand_edited,"
+         "  op_params_json, blendop_params_json) "
          "VALUES"
          " (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16,"
-         "   0, 0, ?17, ?18, ?19, ?20, ?21, ?22, 0, ?23, ?24, ?25)");
+         "   0, 0, ?17, ?18, ?19, ?20, ?21, ?22, 0, ?23, ?24, ?25, ?26)");
       // clang-format on
     }
 
@@ -382,7 +398,7 @@ static void _edit_preset_response(GtkDialog *dialog,
         gchar *params_json = NULL;
         if(g->iop->get_params_json)
         {
-          params_json = g->iop->get_params_json(g->iop);
+          params_json = g->iop->get_params_json(g->iop->params);
           DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 19, NULL, 0, SQLITE_TRANSIENT);
           DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 25,
                                       is_auto_init ? NULL : params_json,
@@ -414,15 +430,18 @@ static void _edit_preset_response(GtkDialog *dialog,
 
       if(g->iop)
       {
-        DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 21, g->iop->blend_params,
-                                   sizeof(dt_develop_blend_params_t), SQLITE_TRANSIENT);
+        DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 21, NULL, 0, SQLITE_TRANSIENT);
         DT_DEBUG_SQLITE3_BIND_INT(stmt, 22, dt_develop_blend_version());
+        gchar *blendop_params_json = get_blend_params_json((dt_develop_blend_params_t *)g->iop->blend_params);
+        DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 26, blendop_params_json, -1, SQLITE_TRANSIENT);
+        g_free(blendop_params_json);
       }
       else
       {
         // we are in the lib case currently we set set all params to 0
         DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 21, NULL, 0, SQLITE_TRANSIENT);
         DT_DEBUG_SQLITE3_BIND_INT(stmt, 22, 0);
+        DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 26, NULL, -1, SQLITE_TRANSIENT);
       }
     }
 
@@ -1022,26 +1041,47 @@ static void _menuitem_update_preset(GtkMenuItem *menuitem, dt_iop_module_t *modu
                                   name))
   {
     // commit all the module fields
+    gchar *params_json = NULL;
+    if(module->get_params_json)
+      params_json = module->get_params_json(module->params);
+
+    gchar *blend_params_json = get_blend_params_json(module->blend_params);
+
     sqlite3_stmt *stmt;
     DT_DEBUG_SQLITE3_PREPARE_V2(dt_database_get(darktable.db),
                                 "UPDATE data.presets"
                                 " SET op_version=?2, op_params=?3, enabled=?4, "
-                                "     blendop_params=?5, blendop_version=?6"
-                                " WHERE name=?7 AND operation=?1",
+                                "     blendop_params=?5, blendop_version=?6, "
+                                "     op_params_json=?7, blendop_params_json=?8"
+                                " WHERE name=?9 AND operation=?1",
                                 -1, &stmt, NULL);
 
     DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 1, module->op, -1, SQLITE_TRANSIENT);
     DT_DEBUG_SQLITE3_BIND_INT(stmt, 2, module->version());
-    DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 3, module->params, module->params_size,
-                               SQLITE_TRANSIENT);
+    if(params_json)
+    {
+      DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 3, NULL, 0, SQLITE_TRANSIENT);
+      DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 7, params_json, -1, SQLITE_TRANSIENT);
+    }
+    else
+    {
+      DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 3, module->params, module->params_size,
+                                 SQLITE_TRANSIENT);
+      DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 7, NULL, -1, SQLITE_TRANSIENT);
+    }
     DT_DEBUG_SQLITE3_BIND_INT(stmt, 4, module->enabled);
-    DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 5, module->blend_params,
-                               sizeof(dt_develop_blend_params_t),
-                               SQLITE_TRANSIENT);
+    // DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 5, module->blend_params,
+    //                            sizeof(dt_develop_blend_params_t),
+    //                            SQLITE_TRANSIENT);
+    DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 5, NULL, 0, SQLITE_TRANSIENT);
     DT_DEBUG_SQLITE3_BIND_INT(stmt, 6, dt_develop_blend_version());
-    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 7, name, -1, SQLITE_TRANSIENT);
+    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 8, blend_params_json, -1, SQLITE_TRANSIENT);
+    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 9, name, -1, SQLITE_TRANSIENT);
     sqlite3_step(stmt);
     sqlite3_finalize(stmt);
+
+    g_free(blend_params_json);
+    g_free(params_json);
   }
 }
 
@@ -1066,7 +1106,7 @@ void dt_gui_presets_apply_preset(const gchar* name,
   DT_DEBUG_SQLITE3_PREPARE_V2(
      dt_database_get(darktable.db),
      "SELECT op_params, enabled, blendop_params, blendop_version, writeprotect,"
-     "       multi_name, multi_name_hand_edited, op_params_json"
+     "       multi_name, multi_name_hand_edited, op_params_json, blendop_params_json"
      " FROM data.presets"
      " WHERE operation = ?1 AND op_version = ?2 AND name = ?3",
      -1, &stmt, NULL);
@@ -1087,9 +1127,10 @@ void dt_gui_presets_apply_preset(const gchar* name,
     const char *multi_name = (const char *)sqlite3_column_text(stmt, 5);
     const int multi_name_hand_edited = sqlite3_column_int(stmt, 6);
     const char *params_json = (const char *)sqlite3_column_text(stmt, 7);
+    const char *blendop_params_json = (const char *)sqlite3_column_text(stmt, 8);
 
     if(module->set_params_json && params_json)
-      module->set_params_json(module, params_json);
+      module->set_params_json(module->params, params_json);
     else if(op_params && (op_length == module->params_size))
       memcpy(module->params, op_params, op_length);
     else
@@ -1112,22 +1153,33 @@ void dt_gui_presets_apply_preset(const gchar* name,
       module->multi_name_hand_edited = multi_name_hand_edited;
     }
 
-    if(blendop_params
-       && (blendop_version == dt_develop_blend_version())
-       && (bl_length == sizeof(dt_develop_blend_params_t)))
+    if(blendop_params_json)
     {
-      dt_iop_commit_blend_params(module, blendop_params);
-    }
-    else if(blendop_params
-            && dt_develop_blend_legacy_params(module, blendop_params,
-                                              blendop_version, module->blend_params,
-                                              dt_develop_blend_version(), bl_length) == 0)
-    {
-      // do nothing
+      const size_t b_size = sizeof(dt_develop_blend_params_t);
+      dt_develop_blend_params_t *b = malloc(b_size);
+      set_blend_params_json(b, blendop_params_json);
+      dt_iop_commit_blend_params(module, b);
+      free(b);
     }
     else
     {
-      dt_iop_commit_blend_params(module, module->default_blendop_params);
+      if(blendop_params
+        && (blendop_version == dt_develop_blend_version())
+        && (bl_length == sizeof(dt_develop_blend_params_t)))
+      {
+        dt_iop_commit_blend_params(module, blendop_params);
+      }
+      else if(blendop_params
+              && dt_develop_blend_legacy_params(module, blendop_params,
+                                                blendop_version, module->blend_params,
+                                                dt_develop_blend_version(), bl_length) == 0)
+      {
+        // do nothing
+      }
+      else
+      {
+        dt_iop_commit_blend_params(module, module->default_blendop_params);
+      }
     }
 
     if(!writeprotect) dt_gui_store_last_preset(name);
@@ -1200,7 +1252,7 @@ gboolean dt_gui_presets_autoapply_for_module(dt_iop_module_t *module, GtkWidget 
   char query[2024];
   // clang-format off
   snprintf(query, sizeof(query),
-     "SELECT name, op_params, blendop_params"
+     "SELECT name, op_params, op_params_json, blendop_params, blendop_params_json"
      " FROM data.presets"
      " WHERE operation = ?1"
      "        AND ((autoapply=1"
@@ -1258,10 +1310,28 @@ gboolean dt_gui_presets_autoapply_for_module(dt_iop_module_t *module, GtkWidget 
     if(widget)
     {
       dt_iop_params_t *params = (dt_iop_params_t *)sqlite3_column_blob(stmt, 1);
-      dt_develop_blend_params_t *blend_params = (dt_iop_params_t *)sqlite3_column_blob(stmt, 2);
-      if(sqlite3_column_bytes(stmt, 1) == module->params_size
-         && sqlite3_column_bytes(stmt, 2) == sizeof(dt_develop_blend_params_t))
-        dt_bauhaus_update_from_field(module, widget, params, blend_params);
+      const char *params_json = (const char *)sqlite3_column_text(stmt, 2);
+      dt_develop_blend_params_t *blend_params = (dt_iop_params_t *)sqlite3_column_blob(stmt, 3);
+      const char *blend_params_json = (const char *)sqlite3_column_text(stmt, 4);
+
+      if(module->set_params_json && params_json && blend_params_json)
+      {
+        dt_iop_params_t *p = g_malloc0(module->params_size);
+        module->set_params_json(p, params_json);
+
+        dt_develop_blend_params_t *b = g_malloc0(sizeof(dt_develop_blend_params_t));
+        set_blend_params_json(b, blend_params_json);
+
+        dt_bauhaus_update_from_field(module, widget, p, b);
+        g_free(p);
+        g_free(b);
+      }
+      else
+      {
+        if(sqlite3_column_bytes(stmt, 1) == module->params_size
+          && sqlite3_column_bytes(stmt, 2) == sizeof(dt_develop_blend_params_t))
+          dt_bauhaus_update_from_field(module, widget, params, blend_params);        
+      }
     }
     else
     {
@@ -1664,7 +1734,7 @@ GtkMenu *dt_gui_presets_popup_menu_show_for_module(dt_iop_module_t *module)
     // clang-format off
     query = g_strdup_printf
       ("SELECT name, op_params, writeprotect, description, blendop_params, "
-       "  op_version, enabled"
+       "  op_version, enabled, op_params_json, blendop_params_json"
        " FROM data.presets"
        " WHERE operation=?1"
        "   AND (filter=0"
@@ -1699,7 +1769,8 @@ GtkMenu *dt_gui_presets_popup_menu_show_for_module(dt_iop_module_t *module)
     // don't know for which image. show all we got:
 
     query = g_strdup_printf("SELECT name, op_params, writeprotect, "
-                            "       description, blendop_params, op_version, enabled"
+                            "       description, blendop_params, op_version, enabled, "
+                            " params_json, blendop_params_json"
                             " FROM data.presets"
                             " WHERE operation=?1"
                             " ORDER BY writeprotect %s, LOWER(name), rowid",
@@ -1730,16 +1801,34 @@ GtkMenu *dt_gui_presets_popup_menu_show_for_module(dt_iop_module_t *module)
       last_wp = chk_writeprotect;
       gtk_menu_shell_append(GTK_MENU_SHELL(menu), gtk_separator_menu_item_new());
     }
-    const void *op_params = (void *)sqlite3_column_blob(stmt, 1);
-    const int32_t op_params_size = sqlite3_column_bytes(stmt, 1);
-    const void *blendop_params = (void *)sqlite3_column_blob(stmt, 4);
-    const int32_t bl_params_size = sqlite3_column_bytes(stmt, 4);
+    void *op_params = (void *)sqlite3_column_blob(stmt, 1);
+    int32_t op_params_size = sqlite3_column_bytes(stmt, 1);
+    // const void *blendop_params = (void *)sqlite3_column_blob(stmt, 4);
+    // const int32_t bl_params_size = sqlite3_column_bytes(stmt, 4);
     const int32_t preset_version = sqlite3_column_int(stmt, 5);
     const int32_t enabled = sqlite3_column_int(stmt, 6);
     const int32_t isdisabled = (preset_version == version ? 0 : 1);
     const char *name = (char *)sqlite3_column_text(stmt, 0);
+    const char *op_params_json = (char *)sqlite3_column_text(stmt, 7);
+    const char *blendop_params_json = (char *)sqlite3_column_text(stmt, 8);
     gboolean isdefault = FALSE;
 
+    if(module->set_params_json && op_params_json)
+    {
+      op_params = g_malloc0(params_size);
+      op_params_size = params_size;
+      module->set_params_json(op_params, op_params_json);
+    }
+
+    int32_t bl_params_size = 0;  
+    dt_develop_blend_params_t *blendop_params = NULL;
+    if(blendop_params_json)
+    {
+      blendop_params = g_malloc0(sizeof(dt_develop_blend_params_t));
+      bl_params_size = sizeof(dt_develop_blend_params_t);
+      set_blend_params_json(blendop_params, blendop_params_json);
+    }
+      
     if(darktable.gui->last_preset && strcmp(darktable.gui->last_preset, name) == 0)
       found = TRUE;
 
@@ -1776,6 +1865,10 @@ GtkMenu *dt_gui_presets_popup_menu_show_for_module(dt_iop_module_t *module)
       dt_gui_add_class(mi, "active_menu_item");
       gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(mi), TRUE);
     }
+
+    g_free(blendop_params);
+    if(module->set_params_json && op_params_json)
+      g_free(op_params);
 
     if(isdisabled)
     {

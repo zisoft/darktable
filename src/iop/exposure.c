@@ -290,28 +290,9 @@ int legacy_params(dt_iop_module_t *self,
   if(old_version == 6)
   {
     // convert to json
-    const dt_iop_exposure_params_v6_t *o = (dt_iop_exposure_params_v6_t *)old_params;
+    gchar *params_json = get_params_json((dt_iop_exposure_params_t *)old_params);
 
-    JsonBuilder *json_builder = json_builder_new();  
-    json_builder_begin_object(json_builder);
-    dt_json_add_int(json_builder, "version", self->version());
-    dt_json_add_int(json_builder, "mode", o->mode);
-    dt_json_add_float(json_builder, "black", o->black);
-    dt_json_add_float(json_builder, "exposure", o->exposure);
-    dt_json_add_float(json_builder, "deflicker_percentile", o->deflicker_percentile);
-    dt_json_add_float(json_builder, "deflicker_target_level", o->deflicker_target_level);
-    dt_json_add_bool(json_builder, "compensate_expore_bias", o->compensate_exposure_bias);
-    json_builder_end_object(json_builder);
-
-    // generate JSON
-    JsonGenerator *json_generator = json_generator_new();
-    json_generator_set_root(json_generator, json_builder_get_root(json_builder));
-    gchar *json_data = json_generator_to_data(json_generator, 0);
-
-    g_object_unref(json_generator);
-    g_object_unref(json_builder);
-
-    *new_params = json_data;
+    *new_params = params_json;
     *new_params_size = -1;  // this indicates that we have json now
     *new_version = 7;
     return 0;
@@ -323,16 +304,19 @@ void init_presets(dt_iop_module_so_t *self)
 {
   self->pref_based_presets = TRUE;
 
-  dt_gui_presets_add_generic
-    (_("magic lantern defaults"), self->op,
-     self->version(),
-     &(dt_iop_exposure_params_t){.mode = EXPOSURE_MODE_DEFLICKER,
+  gchar *params_json = self->get_params_json(&(dt_iop_exposure_params_t)
+                                {.mode = EXPOSURE_MODE_DEFLICKER,
                                  .black = 0.0f,
                                  .exposure = 0.0f,
                                  .deflicker_percentile = 50.0f,
                                  .deflicker_target_level = -4.0f,
-                                 .compensate_exposure_bias = FALSE},
-     sizeof(dt_iop_exposure_params_t), 1, DEVELOP_BLEND_CS_RGB_DISPLAY);
+                                 .compensate_exposure_bias = FALSE});
+
+  dt_gui_presets_add_generic
+    (_("magic lantern defaults"), self->op,
+     self->version(),
+     params_json, -1, 1,  DEVELOP_BLEND_CS_RGB_DISPLAY);
+  g_free(params_json);
 
   const gboolean is_scene_referred = dt_is_scene_referred();
 
@@ -1312,19 +1296,18 @@ void gui_cleanup(struct dt_iop_module_t *self)
   IOP_GUI_FREE;
 }
 
-gchar *get_params_json(dt_iop_module_t *self)
+gchar *get_params_json(dt_iop_params_t *params)
 {
-  dt_iop_exposure_params_t *p = (dt_iop_exposure_params_t *)self->params;
+  dt_iop_exposure_params_t *p = (dt_iop_exposure_params_t *)params;
 
   JsonBuilder *json_builder = json_builder_new();  
   json_builder_begin_object(json_builder);
-  dt_json_add_int(json_builder, "version", self->version());
   dt_json_add_int(json_builder, "mode", p->mode);
   dt_json_add_float(json_builder, "black", p->black);
   dt_json_add_float(json_builder, "exposure", p->exposure);
   dt_json_add_float(json_builder, "deflicker_percentile", p->deflicker_percentile);
   dt_json_add_float(json_builder, "deflicker_target_level", p->deflicker_target_level);
-  dt_json_add_bool(json_builder, "compensate_expore_bias", p->compensate_exposure_bias);
+  dt_json_add_bool(json_builder, "compensate_exposure_bias", p->compensate_exposure_bias);
   json_builder_end_object(json_builder);
 
   // generate JSON
@@ -1338,9 +1321,9 @@ gchar *get_params_json(dt_iop_module_t *self)
   return json_data;
 }
 
-int set_params_json(dt_iop_module_t *self, const gchar *json)
+int set_params_json(dt_iop_params_t *params, const gchar *json)
 {
-  dt_iop_exposure_params_t *p = (dt_iop_exposure_params_t *)self->params;
+  dt_iop_exposure_params_t *p = (dt_iop_exposure_params_t *)params;
 
   JsonParser *json_parser = json_parser_new();
 
@@ -1359,6 +1342,10 @@ int set_params_json(dt_iop_module_t *self, const gchar *json)
   p->deflicker_percentile = dt_json_get_float(json_reader, "deflicker_percentile");
   p->deflicker_target_level = dt_json_get_float(json_reader, "deflicker_target_level");
   p->compensate_exposure_bias = dt_json_get_float(json_reader, "compensate_exposure_bias");
+
+  g_object_unref(json_reader);
+  g_object_unref(json_parser);
+
   return 0;
 }
 

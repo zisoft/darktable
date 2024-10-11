@@ -21,6 +21,7 @@
 #include "common/guided_filter.h"
 #include "common/imagebuf.h"
 #include "common/interpolation.h"
+#include "common/json.h"
 #include "common/opencl.h"
 #include "control/control.h"
 #include "develop/imageop.h"
@@ -2275,6 +2276,12 @@ gboolean dt_develop_blend_legacy_params(dt_iop_module_t *module,
     n->feather_version = 0;
     return FALSE;
   }
+  if(new_version == 14)
+  {
+    // from v14 on we have json
+    memcpy(new_params, old_params, sizeof(dt_develop_blend_params_t));
+    return FALSE;
+  }
   return TRUE;
 }
 
@@ -2307,6 +2314,116 @@ gboolean dt_develop_blend_legacy_params_from_so(dt_iop_module_so_t *module_so,
   dt_iop_cleanup_module(module);
   free(module);
   return res;
+}
+
+gchar *get_blend_params_json(dt_develop_blend_params_t *params)
+{
+  JsonBuilder *json_builder = json_builder_new();  
+  json_builder_begin_object(json_builder);
+  dt_json_add_int(json_builder, "mask_mode", params->mask_mode);
+  dt_json_add_int(json_builder, "blend_cst", params->blend_cst);
+  dt_json_add_int(json_builder, "blend_mode", params->blend_mode);
+  dt_json_add_float(json_builder, "blend_parameter", params->blend_parameter);
+  dt_json_add_float(json_builder, "opacity", params->opacity);
+  dt_json_add_int(json_builder, "mask_combine", params->mask_combine);
+  dt_json_add_int(json_builder, "mask_id", params->mask_id);
+  dt_json_add_int(json_builder, "blendif", params->blendif);
+  dt_json_add_float(json_builder, "feathering_radius", params->feathering_radius);
+  dt_json_add_int(json_builder, "feathering_guide", params->feathering_guide);
+  dt_json_add_float(json_builder, "blur_radius", params->blur_radius);
+  dt_json_add_float(json_builder, "contrast", params->contrast);
+  dt_json_add_float(json_builder, "brightness", params->brightness);
+  dt_json_add_float(json_builder, "details", params->details);
+  dt_json_add_int(json_builder, "feather_version", params->feather_version);
+
+  json_builder_set_member_name(json_builder, "blendif_parameters");
+  json_builder_begin_array(json_builder);
+  for(int i = 0; i < 4 * DEVELOP_BLENDIF_SIZE; ++i)
+    json_builder_add_double_value(json_builder, params->blendif_parameters[i]);
+  json_builder_end_array(json_builder);
+
+  json_builder_set_member_name(json_builder, "blendif_boost_factors");
+  json_builder_begin_array(json_builder);
+  for(int i = 0; i < DEVELOP_BLENDIF_SIZE; ++i)
+    json_builder_add_double_value(json_builder, params->blendif_boost_factors[i]);
+  json_builder_end_array(json_builder);
+
+  dt_json_add_string(json_builder, "raster_mask_source", params->raster_mask_source);
+  dt_json_add_int(json_builder, "raster_mask_instance", params->raster_mask_instance);
+  dt_json_add_int(json_builder, "raster_mask_id", params->raster_mask_id);
+  dt_json_add_bool(json_builder, "raster_mask_invert", params->raster_mask_invert);
+  json_builder_end_object(json_builder);
+
+  // generate JSON
+  JsonGenerator *json_generator = json_generator_new();
+  json_generator_set_root(json_generator, json_builder_get_root(json_builder));
+  gchar *json_data = json_generator_to_data(json_generator, 0);
+
+  g_object_unref(json_generator);
+  g_object_unref(json_builder);
+
+  return json_data;
+}
+
+int set_blend_params_json(dt_develop_blend_params_t *params, const gchar *json)
+{
+  JsonParser *json_parser = json_parser_new();
+
+  if(json_parser_load_from_data(json_parser, json, -1, NULL) == FALSE)
+  {              
+    g_object_unref(json_parser);
+    return 1;
+  }
+
+  // Read JSON
+  JsonNode *json_root = json_parser_get_root(json_parser);
+  JsonReader *json_reader = json_reader_new(json_root);
+  params->mask_mode = dt_json_get_int(json_reader, "mask_mode");
+  params->blend_cst = dt_json_get_int(json_reader, "blend_cst");
+  params->blend_mode = dt_json_get_int(json_reader, "blend_mode");
+  params->blend_parameter = dt_json_get_float(json_reader, "blend_parameter");
+  params->opacity = dt_json_get_float(json_reader, "opacity");
+  params->mask_combine = dt_json_get_int(json_reader, "mask_combine");
+  params->mask_id = dt_json_get_int(json_reader, "mask_id");
+  params->feathering_radius = dt_json_get_float(json_reader, "feathering_radius");
+  params->feathering_guide = dt_json_get_int(json_reader, "feathering_guide");
+  params->blur_radius = dt_json_get_float(json_reader, "blur_radius");
+  params->contrast = dt_json_get_float(json_reader, "contrast");
+  params->brightness = dt_json_get_float(json_reader, "brightness");
+  params->details = dt_json_get_float(json_reader, "details");
+  params->feather_version = dt_json_get_int(json_reader, "feather_version");
+
+  json_reader_read_member(json_reader, "blendif_parameters");
+  for(int i = 0; i < 4 * DEVELOP_BLENDIF_SIZE; ++i)
+  {
+    json_reader_read_element(json_reader, i);
+    const float value = (float) json_reader_get_double_value(json_reader);
+    params->blendif_parameters[i] = value;
+    json_reader_end_element(json_reader);
+  }
+  json_reader_end_member(json_reader);
+
+  json_reader_read_member(json_reader, "blendif_boost_factors");
+  for(int i = 0; i < DEVELOP_BLENDIF_SIZE; ++i)
+  {
+    json_reader_read_element(json_reader, i);
+    const float value = (float) json_reader_get_double_value(json_reader);
+    json_reader_end_element(json_reader);
+    params->blendif_boost_factors[i] = value;
+  }
+  json_reader_end_member(json_reader);
+
+  const gchar *raster_mask_source = dt_json_get_string(json_reader, "raster_mask_source");
+  g_strlcpy(params->raster_mask_source, raster_mask_source, sizeof(params->raster_mask_source));
+
+  params->raster_mask_instance = dt_json_get_int(json_reader, "raster_mask_instance");
+  params->raster_mask_id = dt_json_get_int(json_reader, "raster_mask_id");
+  params->raster_mask_invert = dt_json_get_bool(json_reader, "raster_mask_invert");
+
+  g_object_unref(json_reader);
+  g_object_unref(json_parser);
+
+  return 0;
 }
 
 // tools/update_modelines.sh

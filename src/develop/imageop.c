@@ -1525,8 +1525,6 @@ static void _init_presets(dt_iop_module_so_t *module_so)
         }
         else if(legacy_ret == -1)
           auto_init = TRUE;
-        else if(legacy_ret == -2)
-          is_json = TRUE;
       }
       else
         auto_init = TRUE;
@@ -1551,7 +1549,8 @@ static void _init_presets(dt_iop_module_so_t *module_so)
       if(is_json)
       {
         DT_DEBUG_SQLITE3_BIND_BLOB(stmt2, 2, NULL, 0, SQLITE_TRANSIENT);
-        DT_DEBUG_SQLITE3_BIND_TEXT(stmt2, 3, (char *)new_params, -1, SQLITE_TRANSIENT);
+        DT_DEBUG_SQLITE3_BIND_TEXT(stmt2, 3, auto_init ? NULL : (char *)new_params,
+                                   -1, SQLITE_TRANSIENT);
       }
       else
       {
@@ -1620,17 +1619,21 @@ static void _init_presets(dt_iop_module_so_t *module_so)
       }
 
       // and write the new blend params back to the database
+
+      gchar *new_blendop_params_json = get_blend_params_json(new_blend_params);
+
       sqlite3_stmt *stmt2;
       // clang-format off
       DT_DEBUG_SQLITE3_PREPARE_V2(dt_database_get(darktable.db),
                                   "UPDATE data.presets"
-                                  " SET blendop_version=?1, blendop_params=?2"
+                                  " SET blendop_version=?1, blendop_params=NULL,"
+                                  " blendop_params_json=?2"
                                   " WHERE operation=?3 AND name=?4",
                                   -1, &stmt2, NULL);
       // clang-format on
       DT_DEBUG_SQLITE3_BIND_INT(stmt2, 1, dt_develop_blend_version());
-      DT_DEBUG_SQLITE3_BIND_BLOB(stmt2, 2, new_blend_params,
-                                 sizeof(dt_develop_blend_params_t),
+      DT_DEBUG_SQLITE3_BIND_TEXT(stmt2, 2, new_blendop_params_json,
+                                 strlen(new_blendop_params_json),
                                  SQLITE_TRANSIENT);
       DT_DEBUG_SQLITE3_BIND_TEXT(stmt2, 3, module->op, -1, SQLITE_TRANSIENT);
       DT_DEBUG_SQLITE3_BIND_TEXT(stmt2, 4, name, -1, SQLITE_TRANSIENT);
@@ -1638,6 +1641,7 @@ static void _init_presets(dt_iop_module_so_t *module_so)
       sqlite3_step(stmt2);
       sqlite3_finalize(stmt2);
 
+      g_free(new_blendop_params_json);
       free(new_blend_params);
       dt_iop_cleanup_module(module);
       free(module);

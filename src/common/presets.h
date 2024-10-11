@@ -31,12 +31,8 @@ gboolean dt_presets_import_from_file(const char *preset_path);
 gboolean dt_presets_module_can_autoapply(const gchar *operation);
 
 /** get preset multi_name for given module params */
-char *dt_presets_get_module_label(const char *module_name,
-                                  const void *params,
-                                  const uint32_t param_size,
-                                  const gboolean is_default_params,
-                                  const void *blend_params,
-                                  const uint32_t blend_params_size);
+char *dt_presets_get_module_label(dt_iop_module_t *module,
+                                  const gboolean is_default_params);
 
 /* returns the module's multi-name to use given the name of the preset
    and the recorded preset's multi_name. This depends on the preference

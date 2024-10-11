@@ -65,7 +65,7 @@ void dt_presets_save_to_file(const int rowid,
      "   exposure_max, aperture_min, aperture_max, focal_length_min,"
      "   focal_length_max, op_version, blendop_version, enabled,"
      "   multi_priority, multi_name, filter, def, format, multi_name_hand_edited,"
-     "   op_params_json"
+     "   op_params_json, blendop_params_json"
      " FROM data.presets"
      " WHERE rowid = ?1",
      -1, &stmt, NULL);
@@ -99,6 +99,7 @@ void dt_presets_save_to_file(const int rowid,
     const int format = sqlite3_column_double(stmt, 24);
     const int multi_name_hand_edited = sqlite3_column_double(stmt, 25);
     const gchar *params_json = (gchar *)sqlite3_column_text(stmt, 26);
+    const gchar *blendop_params_json = (gchar *)sqlite3_column_text(stmt, 27);
 
     int rc = 0;
 
@@ -129,11 +130,9 @@ void dt_presets_save_to_file(const int rowid,
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "name", "%s", name);
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "description", "%s", description);
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "operation", "%s", operation);
-    if(params_json)
-      xmlTextWriterWriteFormatElement(writer, BAD_CAST "op_params_json", "%s", params_json);
-    else
-      xmlTextWriterWriteFormatElement(writer, BAD_CAST "op_params", "%s",
-                                      dt_preset_encode(stmt, 0));
+    xmlTextWriterWriteFormatElement(writer, BAD_CAST "op_params_json", "%s", params_json);
+    xmlTextWriterWriteFormatElement(writer, BAD_CAST "op_params", "%s",
+                                    dt_preset_encode(stmt, 0));
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "op_version", "%d", op_version);
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "enabled", "%d", enabled);
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "autoapply", "%d", autoapply);
@@ -150,6 +149,7 @@ void dt_presets_save_to_file(const int rowid,
                                     focal_length_min);
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "focal_length_max", "%d",
                                     focal_length_max);
+    xmlTextWriterWriteFormatElement(writer, BAD_CAST "blendop_params_json", "%s", blendop_params_json);
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "blendop_params", "%s",
                                     dt_preset_encode(stmt, 1));
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "blendop_version", "%d",
@@ -251,6 +251,7 @@ gboolean dt_presets_import_from_file(const char *preset_path)
   gchar *op_params_json = get_preset_element(doc, "op_params_json");
   const int op_version = get_preset_element_int(doc, "op_version");
   gchar *blendop_params = get_preset_element(doc, "blendop_params");
+  gchar *blendop_params_json = get_preset_element(doc, "blendop_params_json");
   const int blendop_version = get_preset_element_int(doc, "blendop_version");
   const int enabled = get_preset_element_int(doc, "enabled");
   const int multi_priority = get_preset_element_int(doc, "multi_priority");
@@ -282,7 +283,7 @@ gboolean dt_presets_import_from_file(const char *preset_path)
      "     aperture_min, aperture_max, focal_length_min, focal_length_max,"
      "     op_params, op_version, blendop_params, blendop_version, enabled,"
      "     multi_priority, multi_name, filter, def, format, multi_name_hand_edited,"
-     "     writeprotect, op_params_json)"
+     "     writeprotect, op_params_json, blendop_params_json)"
      "  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, "
      "          ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, 0, ?27)",
      -1, &stmt, NULL);
@@ -305,8 +306,18 @@ gboolean dt_presets_import_from_file(const char *preset_path)
   DT_DEBUG_SQLITE3_BIND_INT(stmt, 15, focal_length_max);
   DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 16, op_params_blob, op_params_len, SQLITE_TRANSIENT);
   DT_DEBUG_SQLITE3_BIND_INT(stmt, 17, op_version);
-  DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 18, blendop_params_blob, blendop_params_len,
-                             SQLITE_TRANSIENT);
+  if(blendop_params_json)
+  {
+    DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 18, NULL, 0, SQLITE_TRANSIENT);
+    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 28, blendop_params_json, strlen(blendop_params_json), SQLITE_TRANSIENT);
+  }
+  else
+  {
+    gchar *bl_params_json = get_blend_params_json((dt_develop_blend_params_t *)blendop_params_blob);
+    DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 18, NULL, 0, SQLITE_TRANSIENT);    
+    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 28, bl_params_json, strlen(bl_params_json), SQLITE_TRANSIENT);
+    g_free(bl_params_json);
+  }
   DT_DEBUG_SQLITE3_BIND_INT(stmt, 19, blendop_version);
   DT_DEBUG_SQLITE3_BIND_INT(stmt, 20, enabled);
   DT_DEBUG_SQLITE3_BIND_INT(stmt, 21, multi_priority);
@@ -358,7 +369,8 @@ gchar *dt_get_active_preset_name(dt_iop_module_t *module, gboolean *writeprotect
   // clang-format off
   DT_DEBUG_SQLITE3_PREPARE_V2(
     dt_database_get(darktable.db),
-     "SELECT name, op_params, blendop_params, enabled, writeprotect"
+     "SELECT name, op_params, op_params_json, blendop_params_json,"
+     " enabled, writeprotect"
      " FROM data.presets"
      " WHERE operation=?1 AND op_version=?2"
      " ORDER BY writeprotect ASC, LOWER(name), rowid",
@@ -370,14 +382,37 @@ gchar *dt_get_active_preset_name(dt_iop_module_t *module, gboolean *writeprotect
   gchar *name = NULL;
   *writeprotect = FALSE;
 
+  size_t op_parameters_size = module->params_size;
+  void *op_parameters = g_malloc0(op_parameters_size);
+
+  const int32_t bl_params_size = sizeof(dt_develop_blend_params_t);
+  dt_develop_blend_params_t *blendop_params = g_malloc0(bl_params_size);
+
   // collect all presets for op from db
   while(sqlite3_step(stmt) == SQLITE_ROW)
   {
-    const void *op_params = (void *)sqlite3_column_blob(stmt, 1);
-    const int32_t op_params_size = sqlite3_column_bytes(stmt, 1);
-    const void *blendop_params = (void *)sqlite3_column_blob(stmt, 2);
-    const int32_t bl_params_size = sqlite3_column_bytes(stmt, 2);
-    const int enabled = sqlite3_column_int(stmt, 3);
+    const void *op_p = (void *)sqlite3_column_blob(stmt, 1);
+    const int32_t op_p_size = sqlite3_column_bytes(stmt, 1);
+    const char *op_params_json = (char *)sqlite3_column_text(stmt, 2);
+    const char *bl_params_json = (char *)sqlite3_column_text(stmt, 3);
+    const int enabled = sqlite3_column_int(stmt, 4);
+
+    const void *op_params;
+    size_t op_params_size;
+
+    if(module->set_params_json && op_params_json)
+    {
+      module->set_params_json(op_parameters, op_params_json);
+      op_params = op_parameters;
+      op_params_size = op_parameters_size;
+    }
+    else
+    {
+      op_params = op_p;
+      op_params_size = op_p_size;
+    }
+
+    set_blend_params_json(blendop_params, bl_params_json);
 
     if(((op_params_size == 0
          && !memcmp(module->default_params, module->params, module->params_size))
@@ -389,25 +424,42 @@ gchar *dt_get_active_preset_name(dt_iop_module_t *module, gboolean *writeprotect
        && module->enabled == enabled)
     {
       name = g_strdup((char *)sqlite3_column_text(stmt, 0));
-      *writeprotect = sqlite3_column_int(stmt, 4);
+      *writeprotect = sqlite3_column_int(stmt, 5);
       break;
     }
   }
   sqlite3_finalize(stmt);
+  g_free(blendop_params);
+  g_free(op_parameters);
+
   return name;
 }
 
-char *dt_presets_get_module_label(const char *module_name,
-                                  const void *params,
-                                  const uint32_t param_size,
-                                  const gboolean is_default_params,
-                                  const void *blend_params,
-                                  const uint32_t blend_params_size)
+char *dt_presets_get_module_label(dt_iop_module_t *module,
+                                  const gboolean is_default_params)
 {
+  const char *module_name = module->op;
+  const void *params = module->params;
+  const uint32_t param_size = module->params_size;
+
   const gboolean auto_module = dt_conf_get_bool("darkroom/ui/auto_module_name_update");
 
   if(!auto_module)
     return NULL;
+
+  gchar *params_json = NULL;
+  if(module->get_params_json)
+    params_json = module->get_params_json((dt_iop_params_t *)params);
+
+  gchar *blend_params_json = get_blend_params_json((dt_develop_blend_params_t *)module->blend_params);
+
+  gchar *params_query = NULL;
+  if(params_json)
+    params_query = g_strdup_printf("AND (op_params_json = ?2%s)",
+                                   is_default_params ? " OR op_params_json IS NULL" : "");
+  else
+    params_query = g_strdup_printf("AND (op_params = ?2%s)",
+                                   is_default_params ? " OR op_params IS NULL" : "");
 
   sqlite3_stmt *stmt;
 
@@ -415,17 +467,24 @@ char *dt_presets_get_module_label(const char *module_name,
   char *query = g_strdup_printf("SELECT name, multi_name"
                                 " FROM data.presets"
                                 " WHERE operation = ?1"
-                                "   AND (op_params = ?2"
-                                "        %s)"
-                                "   AND blendop_params = ?3",
-                                is_default_params ? "OR op_params IS NULL" : "");
+                                "   %s"
+                                "   AND blendop_params_json = ?3",
+                                params_query);
+  // clang-format on
 
   DT_DEBUG_SQLITE3_PREPARE_V2(dt_database_get(darktable.db), query, -1, &stmt, NULL);
-
-  // clang-format on
   DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 1, module_name, strlen(module_name), SQLITE_TRANSIENT);
-  DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 2, params, param_size, SQLITE_TRANSIENT);
-  DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 3, blend_params, blend_params_size, SQLITE_TRANSIENT);
+  if(params_json)
+  {
+    DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 2, params_json, strlen(params_json), SQLITE_TRANSIENT);
+  }
+  else
+    DT_DEBUG_SQLITE3_BIND_BLOB(stmt, 2, params, param_size, SQLITE_TRANSIENT);
+  DT_DEBUG_SQLITE3_BIND_TEXT(stmt, 3, blend_params_json, strlen(blend_params_json), SQLITE_TRANSIENT);
+
+  g_free(params_query);
+  g_free(blend_params_json);
+  g_free(params_json);
 
   char *result = NULL;
 

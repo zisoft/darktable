@@ -760,9 +760,8 @@ static void _dev_auto_module_label(dt_develop_t *dev,
       memcmp(module->params, module->default_params, module->params_size) == 0;
 
     char *preset_name = dt_presets_get_module_label
-      (module->op,
-       module->params, module->params_size, is_default_params,
-       module->blend_params, sizeof(dt_develop_blend_params_t));
+      (module,
+       is_default_params);
 
     // if we have a preset-name, use it. otherwise set the label to the multi-priority
     // except for 0 where the multi-name is cleared.
@@ -1427,9 +1426,8 @@ static void _dev_insert_module(dt_develop_t *dev,
   // actual preset name if any is defined for the default parameters.
 
   char *preset_name = dt_presets_get_module_label
-    (module->op,
-     module->default_params, module->params_size, TRUE,
-     module->blend_params, sizeof(dt_develop_blend_params_t));
+    (module,
+     TRUE);
 
   DT_DEBUG_SQLITE3_PREPARE_V2(
     dt_database_get(darktable.db),
