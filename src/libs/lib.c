@@ -391,23 +391,20 @@ gboolean dt_lib_presets_apply(const gchar *preset,
     int length = sqlite3_column_bytes(stmt, 0);
     const char *json = (char *)sqlite3_column_text(stmt, 1);
     int writeprotect = sqlite3_column_int(stmt, 2);
-    if(blob)
+    for(const GList *it = darktable.lib->plugins; it; it = g_list_next(it))
     {
-      for(const GList *it = darktable.lib->plugins; it; it = g_list_next(it))
+      dt_lib_module_t *module = it->data;
+      if(!strncmp(module->plugin_name, module_name, 128))
       {
-        dt_lib_module_t *module = it->data;
-        if(!strncmp(module->plugin_name, module_name, 128))
-        {
-          gchar *tx = g_strdup_printf("plugins/darkroom/%s/last_preset", module_name);
-          dt_conf_set_string(tx, preset);
-          g_free(tx);
+        gchar *tx = g_strdup_printf("plugins/darkroom/%s/last_preset", module_name);
+        dt_conf_set_string(tx, preset);
+        g_free(tx);
 
-          if(module->set_params_json && json)
-            res = module->set_params_json(module, json);
-          else if(blob)
-            res = module->set_params(module, blob, length);
-          break;
-        }
+        if(module->set_params_json && json)
+          res = module->set_params_json(module, json);
+        else if(blob)
+          res = module->set_params(module, blob, length);
+        break;
       }
     }
 

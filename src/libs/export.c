@@ -2052,7 +2052,7 @@ void *legacy_params(dt_lib_module_t *self,
   else if(old_version == 8)
   {
     // v9: convert to JSON
-    
+
     // format of v8:
     //  - 9 x int32_t (max_width, max_height, upscale, high_quality,
     //                 export_masks, iccintent, icctype, dimensions_type, print_dpi)
@@ -2088,19 +2088,27 @@ void *legacy_params(dt_lib_module_t *self,
     buf += strlen(buf) + 1;
     dt_json_add_string(json_builder, "iccprofile", (char *)buf);
     buf += strlen(buf) + 1;
+    const char *format_name = buf;
     dt_json_add_string(json_builder, "format", (char *)buf);
     buf += strlen(buf) + 1;
+    const char *storage_name = buf;
     dt_json_add_string(json_builder, "storage", (char *)buf);
     buf += strlen(buf) + 1;
 
-    const uint32_t fversion = *(uint32_t *)buf;
+    // const uint32_t fversion = *(uint32_t *)buf;
     buf += sizeof(uint32_t);
-    const uint32_t sversion = *(uint32_t *)buf;
+    // const uint32_t sversion = *(uint32_t *)buf;
     buf += sizeof(uint32_t);
     const uint32_t fsize = *(uint32_t *)buf;
     buf += sizeof(int32_t);
-    const uint32_t ssize = *(uint32_t *)buf;
+    // const uint32_t ssize = *(uint32_t *)buf;
     buf += sizeof(int32_t);
+
+    dt_imageio_module_format_t *mformat = dt_imageio_get_format_by_name(format_name);
+    dt_imageio_module_storage_t *mstorage = dt_imageio_get_storage_by_name(storage_name);
+
+    mformat->get_params_json(mformat, json_builder);
+    mstorage->get_params_json(mstorage, json_builder);
 
     // fdata
     const void *fdata = buf;
@@ -2109,34 +2117,20 @@ void *legacy_params(dt_lib_module_t *self,
     fdata += sizeof(((dt_imageio_module_data_t){}).style);
     const uint32_t style_append = *(uint32_t *)fdata;
     fdata += sizeof(uint32_t);
-    const uint32_t fquality = *(uint32_t *)fdata;
+    // const uint32_t fquality = *(uint32_t *)fdata;
     fdata += sizeof(int32_t);
-    const uint32_t fsubsample = *(uint32_t *)fdata;
+    // const uint32_t fsubsample = *(uint32_t *)fdata;
     buf += fsize;
-
-    // sdata
-    const void *sdata = buf;
-    const char *file_directory = sdata;
-    sdata += strlen(file_directory) + 1;
-    const uint32_t overwrite = *(uint32_t *)sdata;
-    buf += ssize;
 
     dt_json_add_string(json_builder, "style", style);
     dt_json_add_bool(json_builder, "style_append", style_append > 0);
 
-    json_builder_set_member_name(json_builder, "format_params");
-    json_builder_begin_object(json_builder);
-    dt_json_add_int(json_builder, "version", fversion);
-    dt_json_add_int(json_builder, "quality", fquality);
-    dt_json_add_int(json_builder, "subsample", fsubsample);
-    json_builder_end_object(json_builder);
-
-    json_builder_set_member_name(json_builder, "storage_params");
-    json_builder_begin_object(json_builder);
-    dt_json_add_int(json_builder, "version", sversion);
-    dt_json_add_string(json_builder, "file_directory", file_directory);
-    dt_json_add_int(json_builder, "overwrite", overwrite);
-    json_builder_end_object(json_builder);
+    // sdata
+    // const void *sdata = buf;
+    // const char *file_directory = sdata;
+    // sdata += strlen(file_directory) + 1;
+    // const uint32_t overwrite = *(uint32_t *)sdata;
+    // buf += ssize;
 
     json_builder_end_object(json_builder);
 

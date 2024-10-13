@@ -114,6 +114,9 @@ void dt_presets_save_to_file(const int rowid,
       return;
     }
 
+    dt_develop_blend_params_t *blend_params = g_malloc0(sizeof(dt_develop_blend_params_t));
+    set_blend_params_json(blend_params, blendop_params_json);
+
     rc = xmlTextWriterStartDocument(writer, NULL, "UTF-8", NULL);
     if(rc < 0)
     {
@@ -150,8 +153,12 @@ void dt_presets_save_to_file(const int rowid,
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "focal_length_max", "%d",
                                     focal_length_max);
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "blendop_params_json", "%s", blendop_params_json);
+    // xmlTextWriterWriteFormatElement(writer, BAD_CAST "blendop_params", "%s",
+    //                                 dt_preset_encode(stmt, 1));
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "blendop_params", "%s",
-                                    dt_preset_encode(stmt, 1));
+                                    dt_exif_xmp_encode((unsigned char *)blend_params,
+                                                       sizeof(dt_develop_blend_params_t),
+                                                       NULL));
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "blendop_version", "%d",
                                     blendop_version);
     xmlTextWriterWriteFormatElement(writer, BAD_CAST "multi_priority", "%d",
@@ -167,6 +174,8 @@ void dt_presets_save_to_file(const int rowid,
     sqlite3_finalize(stmt);
     xmlTextWriterEndDocument(writer);
     xmlFreeTextWriter(writer);
+
+    g_free(blend_params);
   }
   g_free(filename);
 }
@@ -285,7 +294,7 @@ gboolean dt_presets_import_from_file(const char *preset_path)
      "     multi_priority, multi_name, filter, def, format, multi_name_hand_edited,"
      "     writeprotect, op_params_json, blendop_params_json)"
      "  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, "
-     "          ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, 0, ?27)",
+     "          ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, 0, ?27, ?28)",
      -1, &stmt, NULL);
   // clang-format on
 
