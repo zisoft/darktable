@@ -2209,26 +2209,6 @@ static void _list_view(dt_lib_collect_rule_t *dr)
         else
         // filmroll
         {
-          gchar *order_by = NULL;
-
-          const gboolean sort_by_import_time =
-            dt_conf_is_equal("plugins/collect/filmroll_sort", "import time");
-
-          if(sort_by_import_time)
-          {
-            if(sort_descending)
-              order_by = g_strdup("film_rolls_id DESC");
-            else
-              order_by = g_strdup("film_rolls_id ASC");
-          }
-          else
-          {
-            if(sort_descending)
-              order_by = g_strdup("lower(folder) DESC");
-            else
-              order_by = g_strdup("lower(folder) ASC");
-          }
-
           // clang-format off
           g_snprintf(query, sizeof(query),
                      "SELECT folder, film_rolls_id, COUNT(*) AS count, status"
@@ -2239,11 +2219,8 @@ static void _list_view(dt_lib_collect_rule_t *dr)
                      "        ON ff.id = fr.id)"
                      "   ON film_id = film_rolls_id "
                      " WHERE %s"
-                     " GROUP BY folder"
-                     " ORDER BY %s", where_ext, order_by);
+                     " GROUP BY folder", where_ext);
           // clang-format on
-
-          g_free(order_by);
         }
         break;
     }
@@ -2252,6 +2229,10 @@ static void _list_view(dt_lib_collect_rule_t *dr)
 
     if(strlen(query) > 0)
     {
+      gtk_tree_sortable_set_sort_column_id (GTK_TREE_SORTABLE(model),
+                                            GTK_TREE_SORTABLE_UNSORTED_SORT_COLUMN_ID,
+                                            GTK_SORT_ASCENDING);
+
       DT_DEBUG_SQLITE3_PREPARE_V2(dt_database_get(darktable.db), query, -1, &stmt, NULL);
       while(sqlite3_step(stmt) == SQLITE_ROW)
       {
@@ -2338,6 +2319,12 @@ static void _list_view(dt_lib_collect_rule_t *dr)
         g_free(escaped_text);
       }
       sqlite3_finalize(stmt);
+
+      gtk_tree_sortable_set_sort_column_id(GTK_TREE_SORTABLE(model),
+                                           DT_LIB_COLLECT_COL_TEXT,
+                                           sort_descending
+                                            ? GTK_SORT_DESCENDING
+                                            : GTK_SORT_ASCENDING);
     }
 
     gtk_tree_view_set_tooltip_column(GTK_TREE_VIEW(d->view), DT_LIB_COLLECT_COL_TOOLTIP);
@@ -3422,6 +3409,27 @@ static gint _sort_model_func(GtkTreeModel *model,
   return ib - ia;
 }
 
+static gint _sort_model_text_func(GtkTreeModel *model,
+                                  GtkTreeIter *a,
+                                  GtkTreeIter *b,
+                                  dt_lib_module_t *self)
+{
+  gchar *a_text, *b_text;
+  gtk_tree_model_get(model, a, DT_LIB_COLLECT_COL_TEXT, &a_text, -1);
+  gtk_tree_model_get(model, b, DT_LIB_COLLECT_COL_TEXT, &b_text, -1);
+  
+  gchar *a_nc_nat = g_utf8_collate_key_for_filename(a_text, -1);
+  gchar *b_nc_nat = g_utf8_collate_key_for_filename(b_text, -1);
+
+  const gint sort = g_strcmp0(a_nc_nat, b_nc_nat);
+
+  g_free(a_text);
+  g_free(b_text);
+  g_free(a_nc_nat);
+  g_free(b_nc_nat);
+  return sort;
+}
+
 #ifdef _WIN32
 void _mount_changed(GVolumeMonitor *volume_monitor,
                     GMount *mount,
@@ -3740,6 +3748,8 @@ void gui_init(dt_lib_module_t *self)
       G_TYPE_BOOLEAN, G_TYPE_UINT, G_TYPE_UINT));
   gtk_tree_sortable_set_sort_func(GTK_TREE_SORTABLE(listmodel), DT_LIB_COLLECT_COL_INDEX,
                                   (GtkTreeIterCompareFunc)_sort_model_func, self, NULL);
+  gtk_tree_sortable_set_sort_func(GTK_TREE_SORTABLE(listmodel), DT_LIB_COLLECT_COL_TEXT,
+                                  (GtkTreeIterCompareFunc)_sort_model_text_func, self, NULL);
   d->listfilter = gtk_tree_model_filter_new(listmodel, NULL);
   gtk_tree_model_filter_set_visible_column
     (GTK_TREE_MODEL_FILTER(d->listfilter), DT_LIB_COLLECT_COL_VISIBLE);
