@@ -53,7 +53,7 @@
 #define LAST_FULL_DATABASE_VERSION_DATA    10
 // You HAVE TO bump THESE versions whenever you add an update branches to _upgrade_*_schema_step()!
 #define CURRENT_DATABASE_VERSION_LIBRARY 56
-#define CURRENT_DATABASE_VERSION_DATA    10
+#define CURRENT_DATABASE_VERSION_DATA    11
 
 #define USE_NESTED_TRANSACTIONS
 #define MAX_NESTED_TRANSACTIONS 5
@@ -3171,6 +3171,33 @@ static int _upgrade_data_schema_step(dt_database_t *db, int version)
              "can't set multi_name_hand_edited column");
 
     new_version = 10;
+  }
+  else if(version == 10)
+  {
+    TRY_EXEC("CREATE TABLE data.meta_data (id INTEGER PRIMARY KEY, name VARCHAR, "
+             "title VARCHAR, internal INTEGER, visible, private, display_order INTEGER)",
+             "can't create new meta_data_keys table");
+
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(0, 'Xmp.dc.creator', 'creator', 1, 1, 0, 2)",
+             "can't insert meta_data_key record");
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(1, 'Xmp.dc.publisher', 'publisher', 1, 1, 0, 3)",
+             "can't insert meta_data_key record");
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(2, 'Xmp.dc.title', 'title', 1, 1, 0, 0)",
+             "can't insert meta_data_key record");
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(3, 'Xmp.dc.description', 'description', 1, 1, 0, 1)",
+             "can't insert meta_data_key record");
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(4, 'Xmp.dc.rights', 'rights', 1, 1, 0, 4)",
+             "can't insert meta_data_key record");
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(5, 'Xmp.acdsee.notes', 'notes', 1, 1, 0, 5)",
+             "can't insert meta_data_key record");
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(6, 'Xmp.darktable.version_name', 'version name', 1, 1, 0, 6)",
+             "can't insert meta_data_key record");
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(7, 'Xmp.darktable.image_id', 'image id', 1, 1, 0, 7)",
+             "can't insert meta_data_key record");
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(8, 'Xmp.xmpMM.PreservedFileName', 'preserved filename', 1, 1, 0, 8)",
+             "can't insert meta_data_key record");
+
+    new_version = 11;
   }
   else
     new_version = version; // should be the fallback so that calling code sees that we are in an infinite loop
