@@ -3174,9 +3174,15 @@ static int _upgrade_data_schema_step(dt_database_t *db, int version)
   }
   else if(version == 10)
   {
-    TRY_EXEC("CREATE TABLE data.meta_data (id INTEGER PRIMARY KEY, name VARCHAR, "
-             "title VARCHAR, type INTEGER, visible INTEGER, private INTEGER, display_order INTEGER)",
+    TRY_EXEC("CREATE TABLE data.meta_data (key INTEGER PRIMARY KEY, tagname VARCHAR, "
+             "name VARCHAR, type INTEGER, visible INTEGER, private INTEGER, display_order INTEGER)",
              "can't create new meta_data_keys table");
+
+    TRY_EXEC("CREATE UNIQUE INDEX data.meta_data_tagname_idx ON meta_data (tagname)",
+             "can't create index `meta_data_name_idx' in database");
+
+    TRY_EXEC("CREATE UNIQUE INDEX data.meta_data_name_idx ON meta_data (name)",
+             "can't create index `meta_data_title_idx' in database");
 
     TRY_EXEC("INSERT INTO data.meta_data VALUES(0, 'Xmp.dc.creator', 'creator', 0, 1, 0, 2)",
              "can't insert meta_data_key record");
