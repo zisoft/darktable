@@ -3175,7 +3175,7 @@ static int _upgrade_data_schema_step(dt_database_t *db, int version)
   else if(version == 10)
   {
     TRY_EXEC("CREATE TABLE data.meta_data (key INTEGER PRIMARY KEY, tagname VARCHAR, "
-             "name VARCHAR, type INTEGER, visible INTEGER, private INTEGER, display_order INTEGER)",
+             "name VARCHAR, type INTEGER, visible INTEGER, private INTEGER, dt_default INTEGER, display_order INTEGER)",
              "can't create new meta_data_keys table");
 
     TRY_EXEC("CREATE UNIQUE INDEX data.meta_data_tagname_idx ON meta_data (tagname)",
@@ -3184,23 +3184,23 @@ static int _upgrade_data_schema_step(dt_database_t *db, int version)
     TRY_EXEC("CREATE UNIQUE INDEX data.meta_data_name_idx ON meta_data (name)",
              "can't create index `meta_data_title_idx' in database");
 
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(0, 'Xmp.dc.creator', 'creator', 0, 1, 0, 2)",
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(0, 'Xmp.dc.creator', 'creator', 0, 1, 0, 1, 2)",
              "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(1, 'Xmp.dc.publisher', 'publisher', 0, 1, 0, 3)",
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(1, 'Xmp.dc.publisher', 'publisher', 0, 1, 0, 1, 3)",
              "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(2, 'Xmp.dc.title', 'title', 0, 1, 0, 0)",
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(2, 'Xmp.dc.title', 'title', 0, 1, 0, 1, 0)",
              "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(3, 'Xmp.dc.description', 'description', 0, 1, 0, 1)",
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(3, 'Xmp.dc.description', 'description', 0, 1, 0, 1, 1)",
              "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(4, 'Xmp.dc.rights', 'rights', 0, 1, 0, 4)",
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(4, 'Xmp.dc.rights', 'rights', 0, 1, 0, 1, 4)",
              "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(5, 'Xmp.acdsee.notes', 'notes', 0, 1, 0, 5)",
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(5, 'Xmp.acdsee.notes', 'notes', 0, 1, 0, 1, 5)",
              "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(6, 'Xmp.darktable.version_name', 'version name', 1, 0, 0, 6)",
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(6, 'Xmp.darktable.version_name', 'version name', 1, 0, 0, 1, 6)",
              "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(7, 'Xmp.darktable.image_id', 'image id', 2, 1, 0, 7)",
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(7, 'Xmp.darktable.image_id', 'image id', 2, 1, 0, 1, 7)",
              "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(8, 'Xmp.xmpMM.PreservedFileName', 'preserved filename', 1, 0, 0, 8)",
+    TRY_EXEC("INSERT INTO data.meta_data VALUES(8, 'Xmp.xmpMM.PreservedFileName', 'preserved filename', 1, 0, 0, 1, 8)",
              "can't insert meta_data_key record");
 
     new_version = 11;
