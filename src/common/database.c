@@ -3184,24 +3184,51 @@ static int _upgrade_data_schema_step(dt_database_t *db, int version)
     TRY_EXEC("CREATE UNIQUE INDEX data.meta_data_name_idx ON meta_data (name)",
              "can't create index `meta_data_title_idx' in database");
 
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(0, 'Xmp.dc.creator', 'creator', 0, 1, 0, 1, 2)",
-             "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(1, 'Xmp.dc.publisher', 'publisher', 0, 1, 0, 1, 3)",
-             "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(2, 'Xmp.dc.title', 'title', 0, 1, 0, 1, 0)",
-             "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(3, 'Xmp.dc.description', 'description', 0, 1, 0, 1, 1)",
-             "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(4, 'Xmp.dc.rights', 'rights', 0, 1, 0, 1, 4)",
-             "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(5, 'Xmp.acdsee.notes', 'notes', 0, 1, 0, 1, 5)",
-             "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(6, 'Xmp.darktable.version_name', 'version name', 1, 0, 0, 1, 6)",
-             "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(7, 'Xmp.darktable.image_id', 'image id', 2, 1, 0, 1, 7)",
-             "can't insert meta_data_key record");
-    TRY_EXEC("INSERT INTO data.meta_data VALUES(8, 'Xmp.xmpMM.PreservedFileName', 'preserved filename', 1, 0, 0, 1, 8)",
-             "can't insert meta_data_key record");
+    gchar *query = NULL;
+    query = g_strdup_printf("INSERT INTO data.meta_data VALUES(0, 'Xmp.dc.creator', '%s', 0, 1, 0, 1, 2)",
+                            _("creator"));
+    TRY_EXEC(query, "can't insert meta_data_key record");
+    g_free(query);
+
+    query = g_strdup_printf("INSERT INTO data.meta_data VALUES(1, 'Xmp.dc.publisher', '%s', 0, 1, 0, 1, 3)",
+                            _("publisher"));
+    TRY_EXEC(query, "can't insert meta_data_key record");
+    g_free(query);
+
+    query = g_strdup_printf("INSERT INTO data.meta_data VALUES(2, 'Xmp.dc.title', '%s', 0, 1, 0, 1, 0)",
+                            _("title"));
+    TRY_EXEC(query, "can't insert meta_data_key record");
+    g_free(query);
+
+    query = g_strdup_printf("INSERT INTO data.meta_data VALUES(3, 'Xmp.dc.description', '%s', 0, 1, 0, 1, 1)",
+                            _("description"));
+    TRY_EXEC(query, "can't insert meta_data_key record");
+    g_free(query);
+
+    query = g_strdup_printf("INSERT INTO data.meta_data VALUES(4, 'Xmp.dc.rights', '%s', 0, 1, 0, 1, 4)",
+                            _("rights"));
+    TRY_EXEC(query, "can't insert meta_data_key record");
+    g_free(query);
+
+    query = g_strdup_printf("INSERT INTO data.meta_data VALUES(5, 'Xmp.acdsee.notes', '%s', 0, 1, 0, 1, 5)",
+                            _("notes"));
+    TRY_EXEC(query, "can't insert meta_data_key record");
+    g_free(query);
+
+    query = g_strdup_printf("INSERT INTO data.meta_data VALUES(6, 'Xmp.darktable.version_name', '%s', 1, 0, 0, 1, 6)",
+                            _("version name"));
+    TRY_EXEC(query, "can't insert meta_data_key record");
+    g_free(query);
+
+    query = g_strdup_printf("INSERT INTO data.meta_data VALUES(7, 'Xmp.darktable.image_id', '%s', 2, 1, 0, 1, 7)",
+                            _("image id"));
+    TRY_EXEC(query, "can't insert meta_data_key record");
+    g_free(query);
+
+    query = g_strdup_printf("INSERT INTO data.meta_data VALUES(8, 'Xmp.xmpMM.PreservedFileName', '%s', 1, 0, 0, 1, 8)",
+                            _("preserved filename"));
+    TRY_EXEC(query, "can't insert meta_data_key record");
+    g_free(query);
 
     new_version = 11;
   }
