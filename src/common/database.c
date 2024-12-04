@@ -3207,7 +3207,7 @@ static int _upgrade_data_schema_step(dt_database_t *db, int version)
     g_free(query);
 
     query = g_strdup_printf("INSERT INTO data.meta_data VALUES(4, 'Xmp.dc.rights', '%s', %d, 1, 0, 1, 4)",
-                            _("rights"));
+                            _("rights"), DT_METADATA_TYPE_USER);
     TRY_EXEC(query, "can't insert meta_data_key record");
     g_free(query);
 
