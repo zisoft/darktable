@@ -1,6 +1,6 @@
 /*
     This file is part of darktable,
-    Copyright (C) 2019-2023 darktable developers.
+    Copyright (C) 2019-2024 darktable developers.
 
 
     darktable is free software: you can redistribute it and/or modify
@@ -166,7 +166,7 @@ static void _formula_edited(GtkCellRenderer *renderer, gchar *path, gchar *new_t
 static void _formula_editing_started(GtkCellRenderer *renderer, GtkCellEditable *editable,
                                      char *path, dt_lib_export_metadata_t *d)
 {
-  dt_gtkentry_setup_completion(GTK_ENTRY(editable), dt_gtkentry_get_default_path_compl_list());
+  dt_gtkentry_setup_variables_completion(GTK_ENTRY(editable));
 }
 
 char *dt_lib_export_metadata_configuration_dialog(char *metadata_presets, const gboolean ondisk)
