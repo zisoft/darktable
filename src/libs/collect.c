@@ -3835,6 +3835,7 @@ void gui_cleanup(dt_lib_module_t *self)
   DT_CONTROL_SIGNAL_DISCONNECT(filmrolls_removed, self);
   DT_CONTROL_SIGNAL_DISCONNECT(tag_changed, self);
   DT_CONTROL_SIGNAL_DISCONNECT(_geotag_changed, self);
+  DT_CONTROL_SIGNAL_DISCONNECT(_metadata_changed, self);
   DT_CONTROL_SIGNAL_DISCONNECT(view_set_click, self);
   darktable.view_manager->proxy.module_collect.module = NULL;
   free(d->params);
