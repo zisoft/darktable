@@ -37,6 +37,8 @@
 
 DT_MODULE(5)
 
+static GtkCellEditable *_active_editable;
+
 typedef enum dt_metadata_pref_cols_t
 {
   DT_METADATA_PREF_COL_KEY,         // key
@@ -679,6 +681,24 @@ static void _private_toggled_callback(GtkCellRendererToggle *cell_renderer,
   _toggled_callback(path_str, user_data, DT_METADATA_PREF_COL_PRIVATE);
 }
 
+static gboolean _focus_out_commit(GtkCellEditable *editable,
+                                  GdkEvent        *event,
+                                  gpointer         user_data)
+{
+  gtk_cell_editable_editing_done(editable);
+  gtk_cell_editable_remove_widget(editable);
+  return FALSE;
+}
+
+static void _display_name_editing_started (GtkCellRenderer *renderer,
+                                           GtkCellEditable *editable,
+                                           char            *path,
+                                           gpointer         user_data)
+{
+  g_signal_connect(editable, "focus-out-event", G_CALLBACK(_focus_out_commit), NULL);
+  g_set_weak_pointer(&_active_editable, editable);
+}
+
 static void _display_name_edited_callback(GtkCellRenderer *renderer,
                                           gchar *path_str,
                                           gchar *new_text,
@@ -904,6 +924,7 @@ static void _menuitem_preferences(GtkMenuItem *menuitem,
      "text", DT_METADATA_PREF_COL_NAME, NULL);
   g_object_set(renderer, "editable", TRUE, NULL);
   g_signal_connect(G_OBJECT(renderer), "edited", G_CALLBACK(_display_name_edited_callback), store);  
+  g_signal_connect(G_OBJECT(renderer), "editing-started", G_CALLBACK(_display_name_editing_started), NULL);
   gtk_tree_view_column_set_expand(column, TRUE);
   gtk_tree_view_append_column(GTK_TREE_VIEW(view), column);
   renderer = gtk_cell_renderer_toggle_new();
@@ -964,6 +985,9 @@ static void _menuitem_preferences(GtkMenuItem *menuitem,
 
   if(res == GTK_RESPONSE_ACCEPT)
   {
+    if(_active_editable)
+      gtk_cell_editable_editing_done(_active_editable);
+    
     // delete metadata
     GList *keys_str = NULL;
     for(GList *key_iter = d->metadata_to_delete; key_iter; key_iter = key_iter->next)
