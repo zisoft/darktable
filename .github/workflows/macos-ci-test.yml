@@ -41,7 +41,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: false
-          ref: b7b26f17ea6e7381aa75056d307a8b839dc5bcab
+          ref: 053316ec412d9238450b44fb47f3b391a3c40be8
           path: src
           fetch-depth: 1
       - name: Get only those submodules that are needed for build
