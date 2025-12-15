@@ -17,6 +17,7 @@ jobs:
       matrix:
         build:
           - { os: macos-14, xcode: 16.2, deployment: 14.0 } # LLVM16, arm64
+          - { os: macos-15-intel, xcode: "26.1.1", deployment: 15.0 } # LLVM16, arm64
         compiler:
           - { compiler: XCode,   CC: cc, CXX: c++ }
         btype: [ Release ]
