@@ -1814,6 +1814,22 @@ static GtkWidget *_init_outer_border(const gint width,
   return widget;
 }
 
+static void _main_window_realize(GtkWidget *widget, gpointer user_data)
+{
+  GdkWindow *window = gtk_widget_get_window(widget);
+  if(window)
+  {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    gdk_window_set_background_rgba(window, &darktable.gui->colors[DT_GUI_COLOR_BG]);
+#pragma GCC diagnostic pop
+
+#ifdef GDK_WINDOWING_QUARTZ
+    dt_osx_set_window_background(widget, &darktable.gui->colors[DT_GUI_COLOR_DARKROOM_BG]);
+#endif
+  }
+}
+
 static void _init_widgets(dt_gui_gtk_t *gui)
 {
 
@@ -1847,6 +1863,8 @@ static void _init_widgets(dt_gui_gtk_t *gui)
   gtk_window_set_icon_name(GTK_WINDOW(widget), "darktable");
   gtk_window_set_title(GTK_WINDOW(widget), "darktable");
 
+  g_signal_connect(G_OBJECT(widget), "realize",
+                   G_CALLBACK(_main_window_realize), NULL);
   g_signal_connect(G_OBJECT(widget), "delete_event",
                    G_CALLBACK(_gui_quit_callback), NULL);
   g_signal_connect(G_OBJECT(widget), "focus-in-event",
@@ -3627,14 +3645,13 @@ void dt_gui_apply_theme()
   GtkWidget *main_window = dt_ui_main_window(darktable.gui->ui);
   GtkStyleContext *ctx = gtk_widget_get_style_context(main_window);
 
-  c[DT_GUI_COLOR_BG] = (GdkRGBA){ 0.1333, 0.1333, 0.1333, 1.0 };
-
   const struct color_init
   {
     const char *name;
     GdkRGBA default_col;
   } init[DT_GUI_COLOR_LAST]
-      = { [DT_GUI_COLOR_DARKROOM_BG] = { "darkroom_bg_color", { .2, .2, .2, 1.0 } },
+      = { [DT_GUI_COLOR_BG] = { "bg_color", { 0.1333, 0.1333, 0.1333, 1.0 } },
+          [DT_GUI_COLOR_DARKROOM_BG] = { "darkroom_bg_color", { .2, .2, .2, 1.0 } },
           [DT_GUI_COLOR_DARKROOM_PREVIEW_BG] = { "darkroom_preview_bg_color", { .1, .1, .1, 1.0 } },
           [DT_GUI_COLOR_LIGHTTABLE_BG] = { "lighttable_bg_color", { .2, .2, .2, 1.0 } },
           [DT_GUI_COLOR_LIGHTTABLE_PREVIEW_BG] = { "lighttable_preview_bg_color", { .1, .1, .1, 1.0 } },
@@ -3675,12 +3692,28 @@ void dt_gui_apply_theme()
           [DT_GUI_COLOR_COLOR_ASSESSMENT_BG] = { "color_assessment_bg_color", { 0.4663, 0.4663, 0.4663, 1.0} },
           [DT_GUI_COLOR_COLOR_ASSESSMENT_FG] = { "color_assessment_fg_color", { 1.0, 1.0, 1.0, 1.0} } };
 
-  // starting from 1 as DT_GUI_COLOR_BG is not part of this table
-  for(int i = 1; i < DT_GUI_COLOR_LAST; i++)
+  // starting from 0 as DT_GUI_COLOR_BG is now part of this table
+  for(int i = 0; i < DT_GUI_COLOR_LAST; i++)
   {
     if(!gtk_style_context_lookup_color(ctx, init[i].name, &c[i]))
     {
       c[i] = init[i].default_col;
+    }
+  }
+
+  if(gtk_widget_get_realized(main_window))
+  {
+    GdkWindow *window = gtk_widget_get_window(main_window);
+    if(window)
+    {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+      gdk_window_set_background_rgba(window, &c[DT_GUI_COLOR_BG]);
+#pragma GCC diagnostic pop
+
+#ifdef GDK_WINDOWING_QUARTZ
+      dt_osx_set_window_background(main_window, &c[DT_GUI_COLOR_BG]);
+#endif
     }
   }
 }

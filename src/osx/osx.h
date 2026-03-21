@@ -29,6 +29,7 @@ char* dt_osx_get_bundle_res_path();
 void dt_osx_prepare_environment();
 void dt_osx_focus_window();
 gboolean dt_osx_open_url(const char *url);
+void dt_osx_set_window_background(GtkWidget *widget, const GdkRGBA *color);
 
 G_END_DECLS
 

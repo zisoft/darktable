@@ -25,6 +25,9 @@
 #include <gtk/gtk.h>
 #ifdef GDK_WINDOWING_QUARTZ
 #include <gdk/gdkquartz.h>
+extern "C" {
+#include <gdk/quartz/gdkquartz-cocoa-access.h>
+}
 #endif
 #include <gio/gio.h>
 #include <glib.h>
@@ -38,6 +41,7 @@
 #define P11_KIT_FUTURE_UNSTABLE_API
 #include <p11-kit/p11-kit.h>
 #endif
+#include <objc/runtime.h>
 #include "osx.h"
 #include "libintl.h"
 
@@ -293,6 +297,39 @@ void dt_osx_focus_window()
 gboolean dt_osx_open_url(const char *url)
 {
   return [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:@(url)]];
+}
+
+static BOOL _returnYes(id self, SEL _cmd)
+{
+  return YES;
+}
+
+void dt_osx_set_window_background(GtkWidget *widget, const GdkRGBA *color)
+{
+#ifdef GDK_WINDOWING_QUARTZ
+  @autoreleasepool
+  {
+    GdkWindow *window = gtk_widget_get_window(widget);
+    if(window)
+    {
+      NSWindow *native = gdk_quartz_window_get_nswindow(window);
+      if(native)
+      {
+        [native setBackgroundColor:[NSColor colorWithCalibratedRed:color->red
+                                                           green:color->green
+                                                            blue:color->blue
+                                                           alpha:color->alpha]];
+
+        /* try to fix flicker on resize by preserving content */
+        NSView *content = [native contentView];
+        if(content)
+        {
+          class_addMethod([content class], @selector(preservesContentDuringLiveResize), (IMP)_returnYes, "c@:");
+        }
+      }
+    }
+  }
+#endif
 }
 
 @interface AppDelegate : NSObject <NSApplicationDelegate>
