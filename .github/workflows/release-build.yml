@@ -53,7 +53,7 @@ jobs:
           brew update > /dev/null || true
           cd src/.ci
           export HOMEBREW_NO_INSTALL_UPGRADE=1
-          brew bundle --verbose || true
+          brew bundle --verbose --quiet || true
 
           # rebuild graphicsmagick for macOS bundling
           export HOMEBREW_NO_INSTALL_FROM_API=1
