@@ -136,6 +136,12 @@ FILE(COPY shortcutsrc ${LOCALIZED_SHORTCUTS} DESTINATION "${DARKTABLE_DATADIR}")
 install(FILES shortcutsrc ${LOCALIZED_SHORTCUTS} DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/darktable COMPONENT DTApplication)
 
 #
+# Install IPTC Photo Metadata Technical Reference File
+#
+FILE(COPY iptc-pmd-techreference_2025.1.json DESTINATION "${DARKTABLE_DATADIR}")
+install(FILES iptc-pmd-techreference_2025.1.json DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/darktable COMPONENT DTApplication)
+
+#
 # Install noiseprofiles
 #
 if(${VALIDATE_JSON})
