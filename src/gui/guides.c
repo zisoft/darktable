@@ -983,19 +983,16 @@ static void _settings_autoshow_change(GSimpleAction *action,
   dt_control_queue_redraw_center();
 }
 
-void dt_guides_add_module_menuitem(GMenu *menu,
-                                   GActionGroup *action_group,
+void dt_guides_add_module_menuitem(void *menu,
                                    dt_iop_module_t *module)
 {
+  GtkWidget *mi = gtk_check_menu_item_new_with_label(_("show guides"));
   gchar *key = _conf_get_path(module->op, "autoshow", NULL);
-  GVariant *initial_state = g_variant_new_boolean(dt_conf_get_bool(key));
+  gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(mi), dt_conf_get_bool(key));
   g_free(key);
-
-  GSimpleAction *action = g_simple_action_new_stateful("guides", NULL, initial_state);
-  g_signal_connect(action, "activate", G_CALLBACK(_settings_autoshow_change), module);
-
-  g_action_map_add_action(G_ACTION_MAP(action_group), G_ACTION(action)); 
-  g_menu_append(menu, _("show guides"), "presets.guides");
+  g_signal_connect(G_OBJECT(mi), "activate",
+                   G_CALLBACK(_settings_autoshow_change), module);
+  gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
 }
 
 static void free_guide(void *data)

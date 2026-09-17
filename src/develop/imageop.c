@@ -2615,10 +2615,10 @@ static gboolean _presets_popup_callback(GtkButton *button,
   const gboolean disabled = !module->default_enabled && module->hide_enable_button;
   if(disabled) return FALSE;
 
-  dt_gui_presets_popup_menu_show_for_module(GTK_WIDGET(button), module);
+  GtkMenu *menu = dt_gui_presets_popup_menu_show_for_module(module);
 
-  // dt_gui_menu_popup(menu,
-  //                   GTK_WIDGET(button), GDK_GRAVITY_SOUTH_EAST, GDK_GRAVITY_NORTH_EAST);
+  dt_gui_menu_popup(menu,
+                    GTK_WIDGET(button), GDK_GRAVITY_SOUTH_EAST, GDK_GRAVITY_NORTH_EAST);
 
   return TRUE;
 }
@@ -2633,11 +2633,10 @@ static void _presets_popup_clicked(GtkGestureSingle *gesture,
   if(disabled) return;
 
   GtkWidget *button = dt_gui_get_widget(gesture);
-  // GtkMenu *menu = dt_gui_presets_popup_menu_show_for_module(module);
-  dt_gui_presets_popup_menu_show_for_module(button, module);
+  GtkMenu *menu = dt_gui_presets_popup_menu_show_for_module(module);
 
-  // dt_gui_menu_popup(menu,
-  //                   button, GDK_GRAVITY_SOUTH_EAST, GDK_GRAVITY_NORTH_EAST);
+  dt_gui_menu_popup(menu,
+                    button, GDK_GRAVITY_SOUTH_EAST, GDK_GRAVITY_NORTH_EAST);
 }
 
 /* per-presets-button hysteresis state: a continuous trackpad gesture is a

@@ -3930,12 +3930,12 @@ static void _menuitem_preferences(GSimpleAction *action,
                              DT_COLLECTION_PROP_UNDEF, NULL);
 }
 
-void set_preferences(GMenu *menu, GActionGroup *action_group, dt_lib_module_t *self)
+void set_preferences(void *menu,
+                     dt_lib_module_t *self)
 {
-  GSimpleAction *action = g_simple_action_new("preferences", NULL);
-  g_signal_connect(action, "activate", G_CALLBACK(_menuitem_preferences), self);
-  g_action_map_add_action(G_ACTION_MAP(action_group), G_ACTION(action));
-  g_menu_append(menu, _("preferences..."), "presets.preferences");
+  GtkWidget *mi = gtk_menu_item_new_with_label(_("preferences..."));
+  g_signal_connect(G_OBJECT(mi), "activate", G_CALLBACK(_menuitem_preferences), self);
+  gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
 }
 
 static gint _sort_model_func(GtkTreeModel *model,

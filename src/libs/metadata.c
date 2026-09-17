@@ -842,11 +842,9 @@ static void _fill_grid(dt_lib_module_t *self)
   dt_lib_gui_queue_update(self);
 }
 
-static void _menuitem_preferences(GSimpleAction *action,
-                                  GVariant *parameter,
-                                  gpointer user_data)
+static void _menuitem_preferences(GtkMenuItem *menuitem,
+                                  dt_lib_module_t *self)
 {
-  dt_lib_module_t *self = (dt_lib_module_t *)user_data;
   dt_lib_metadata_t *d = (dt_lib_metadata_t *)self->data;
 
   GtkCellEditable *active_editable = NULL;
@@ -863,7 +861,7 @@ static void _menuitem_preferences(GSimpleAction *action,
   gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_ACCEPT);
   dt_gui_dialog_add_help(GTK_DIALOG(dialog), "metadata_preferences");
   dt_gui_dialog_restore_size(GTK_DIALOG(dialog), "metadata");
-  g_signal_connect(dialog, "key-press-event", G_CALLBACK(dt_handle_dialog_enter), NULL);
+  dt_gui_connect_key(dialog, dt_handle_dialog_enter, NULL);
 
   GtkListStore *store = gtk_list_store_new(DT_METADATA_PREF_NUM_COLS,
                                            G_TYPE_INT,      // key
@@ -947,13 +945,19 @@ static void _menuitem_preferences(GSimpleAction *action,
   gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(w),
                                  GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
 
-  GtkWidget *plus = dtgtk_button_new(dtgtk_cairo_paint_plus_simple, 0, NULL);
-  gtk_widget_set_tooltip_text(plus, _("add metadata tags"));
-  g_signal_connect(G_OBJECT(plus), "clicked", G_CALLBACK(_add_tag_button_clicked), (gpointer)d);
+  GtkWidget *plus = dtgtk_button_new_full(dtgtk_cairo_paint_plus_simple, 0, NULL,
+      &(dtgtk_button_config_t){
+        .tooltip = _("add metadata tags"),
+        .clicked_cb = G_CALLBACK(_add_tag_button_clicked),
+        .clicked_data = (gpointer)d,
+      });
 
-  GtkWidget *minus = dtgtk_button_new(dtgtk_cairo_paint_minus_simple, 0, NULL);
-  gtk_widget_set_tooltip_text(minus, _("delete metadata tag"));
-  g_signal_connect(G_OBJECT(minus), "clicked", G_CALLBACK(_delete_tag_button_clicked), (gpointer)d);
+  GtkWidget *minus = dtgtk_button_new_full(dtgtk_cairo_paint_minus_simple, 0, NULL,
+      &(dtgtk_button_config_t){
+        .tooltip = _("delete metadata tag"),
+        .clicked_cb = G_CALLBACK(_delete_tag_button_clicked),
+        .clicked_data = (gpointer)d,
+      });
   d->delete_button = minus;
 
 #ifdef GDK_WINDOWING_QUARTZ
@@ -1133,12 +1137,11 @@ finish:
   gtk_widget_destroy(dialog);
 }
 
-void set_preferences(GMenu *menu, GActionGroup *action_group, dt_lib_module_t *self)
+void set_preferences(void *menu, dt_lib_module_t *self)
 {
-  GSimpleAction *action = g_simple_action_new("preferences", NULL);
-  g_signal_connect(action, "activate", G_CALLBACK(_menuitem_preferences), self);
-  g_action_map_add_action(G_ACTION_MAP(action_group), G_ACTION(action));
-  g_menu_append(menu, _("preferences..."), "presets.preferences");
+  GtkWidget *mi = gtk_menu_item_new_with_label(_("preferences..."));
+  g_signal_connect(G_OBJECT(mi), "activate", G_CALLBACK(_menuitem_preferences), self);
+  gtk_menu_shell_append(GTK_MENU_SHELL(menu), mi);
 }
 
 void gui_init(dt_lib_module_t *self)
